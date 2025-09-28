@@ -25,9 +25,11 @@ const processControl = {
     maxQueuedDownloads: 4,  //at 1GB per tar.gz file (expanding to 10GB) and 20 seconds to download, 10s timer stay well below SEC.gov 10 requests per second limit and does not occupy too much disk space
     maxFileIngests: 2,  //internal processes to ingest local files leveraging Node's non-blocking model
     maxRetries: 3,
+    submissionProcessTimout: 10*60*1000,  //1 minutes for one .nc file (10 mintues when debugging)
+    downloadProcessTimout: 10*60*1000,  //10 minutes for one gz archive
     retries: {},  // record of retried archive downloads / unzips
     start: new Date("2024-01-02"),  //restart date.  If none, the lesser of the max(filedt) and 2008-01-01 is used
-    end: new Date("2024-03-31"), //if false or not set, scrape continues up to today
+    end: new Date("2024-01-07"), //if false or not set, scrape continues up to today
     days: [
     ], //ingest specific days (also used as retry queue) e.g. ['2013-08-12', '2013-08-14', '2013-11-13', '2013-11-15', '2014-03-04', '2014-08-04', '2014-11-14', '2015-03-31','2015-04-30', '2016-02-18', '2016-02-26', '2016-02-29', '2017-02-24', '2017-02-28', '2017-04-27','2017-05-10', '2017-08-03', '2017-08-04', '2017-08-08', '2017-10-16', '2017-10-23', '2017-10-30', '2017-11-03','2017-11-06', '2017-12-20', '2018-04-26', '2018-04-27', '2018-04-30', '2018-05-01', '2018-11-14']],
     processes: {},
@@ -108,7 +110,7 @@ async function startDownloadManager(processControl, startDownloadManagerCallback
                 downloadingCount++;
                 var runTime = Date.now() - processControl.activeDownloads["d" + d].timeStamp;
                 var status = processControl.activeDownloads["d" + d].status;
-                if ((runTime > (10 * 60 * 1000)) && (status == 'downloading' || status == 'unarchiving')) { // > 10 minutes for one gz archive
+                if ((runTime > processControl.downloadProcessTimout) && (status == 'downloading' || status == 'unarchiving')) { // > 10 minutes for one gz archive
                     console.log(`${(new Date()).toISOString().substr(11, 10)} killing long '${status} process`, processControl.activeDownloads["d" + d].url);
                     addDayToReprocess(processControl.activeDownloads["d" + d].archiveDate, processControl.activeDownloads["d" + d].status);
                     delete processControl.activeDownloads["d" + d];  //if process actually returns, it will gracefully end without proper control reference
@@ -299,7 +301,7 @@ function indexDirectory(processControl, downloadNum, ingestDirectoryCallback){
                 } else {  //check health
                     processControl.runningCount++;
                     let runTime = Date.now() - processControl.processes["p"+p].timeStamp;
-                    if(runTime > 60*1000){ // > 60 seconds for one file
+                    if(runTime > processControl.submissionProcessTimout){ // > 60 seconds for one file
                         console.log(`${(new Date()).toISOString().substr(11, 10)} killing long index process ${processControl.processes["p"+p].name}`);
                         processControl.processes["p"+p].childProcess.kill();
                         delete processControl.processes["p"+p];  //process is dead to me:  a new child process will be forked on next tick of ingestOverSeer in 100ms

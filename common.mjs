@@ -193,16 +193,17 @@ export const runQuery = async (db, sql, params = []) => {
             password: dbConfig.PWD,
             database: dbConfig.DB_NAME
         });
-        
+        let rows;
         try {
             // Execute query
-            const [rows] = await connection.execute(sql, params);
-            return rows;
+            [rows] = await connection.execute(sql, params);
         } finally {
             // Always close the connection
             await connection.end();
         }
+        return rows;
     } catch (error) {
+        console.log(sql, params);
         throw new Error(`Database Query Error: ${error.message}`);
     }
 };

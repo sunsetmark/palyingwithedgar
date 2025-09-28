@@ -143,8 +143,8 @@ export async function processFeedFile(processInfo) {
                     delete doc.lines; //free up memory
                 }
             } else {
+                doc.fileLength += line.length + 1;  //+1 for the newline character when joined
                 if (processInfo.writeExtractedFiles) { //determined above to have a valid ext and be indexable (and not blank)
-                    doc.fileLength += line.length;
                     doc.lines.push(isBinaryFile ? uunencodePadding(line) : line);  
                 }
             }
@@ -185,10 +185,175 @@ export async function processFeedFile(processInfo) {
             if(processInfo.writeJsonMetaDataFiles) {
                 fileWritePromises.push(writeFile(docFilingFolder + processInfo.feedDate + '_' + processInfo.name + '.json', JSON.stringify(submissionMetadata, null, 2), 'utf-8'));
             }
+            
+            // Write feeds metadata to database
+            if (submissionMetadata && submissionMetadata.submission) {
+                writeFeedsMetaData(submissionMetadata.submission, processInfo.feedDate, processInfo.name);
+            }
+            
             //writeSubmissionHeaderRecords();  //insert queries run async and promises pushed onto dbPromises array
             messageParentFinished('ok');
         }
     });
+
+    /**
+     * Writes feeds metadata to database tables
+     * @param {Object} jsonMetaData - The JSON metadata object from SGML processing
+     * @param {string} feedDate - The feed date (YYYYMMDD format)
+     * @param {string} filename - The filename being processed
+     */
+    function writeFeedsMetaData(jsonMetaData, feedDate, filename) {
+        try {
+            
+            // Extract basic filing information
+            const accessionNumber = jsonMetaData.accession_number || '';
+            const filingDate = jsonMetaData.filing_date || '';
+            const formType = jsonMetaData.type || '';
+            const filingSize = submission.docs.reduce((total, doc) => total + (doc.fileLength || 0), 0);
+            
+            // Extract header information (first 100 characters of SGML)
+            const header1000 = sgmlLines.join('\n').substring(0, 1999);
+            
+            // Determine boolean flags based on metadata
+            const isCorrespondence = jsonMetaData.correspondence ? 1 : 0;
+            const isDeletion = jsonMetaData.correction === 'DELETION' ? 1 : 0;
+            const isCorrection = jsonMetaData.correction === 'CORRECTION' ? 1 : 0;
+            const isPrivateToPublic = jsonMetaData.private_to_public ? 1 : 0;
+            
+            // Insert/Update feeds_file table
+            const accessionNumberInt = parseInt(accessionNumber.replace(/-/g, '')) || 0;
+            const feedsFileQuery = `
+                INSERT INTO feeds_file (
+                    feeds_date, feeds_file, filing_size, header_1000, adsh, accession_number,
+                    filing_date, form_type, is_correspondence, is_deletion, 
+                    is_correction, is_private_to_public
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    filing_size = VALUES(filing_size),
+                    header_1000 = VALUES(header_1000),
+                    adsh = VALUES(adsh),
+                    accession_number = VALUES(accession_number),
+                    filing_date = VALUES(filing_date),
+                    form_type = VALUES(form_type),
+                    is_correspondence = VALUES(is_correspondence),
+                    is_deletion = VALUES(is_deletion),
+                    is_correction = VALUES(is_correction),
+                    is_private_to_public = VALUES(is_private_to_public)
+            `;
+            
+            dbPromises.push(common.runQuery('POC', feedsFileQuery, [
+                feedDate, filename, filingSize, header1000, accessionNumber, accessionNumberInt,
+                filingDate, formType, isCorrespondence, isDeletion, isCorrection, isPrivateToPublic
+            ]));
+            
+            // Process filers (CIKs) - both filer and reporting_owner types
+            const processFilers = (filers, filerType) => {
+                if (filers && Array.isArray(filers)) {
+                    filers.forEach((filer, index) => {
+                        let entityData = filer.company_data || filer.owner_data;
+                        if (entityData && entityData.cik && entityData.conformed_name) {
+                            const feedsFileCikQuery = `
+                                INSERT INTO feeds_file_cik (
+                                    feeds_date, feeds_file, cik, filer_type, entity_name
+                                ) VALUES (?, ?, ?, ?, ?)
+                                ON DUPLICATE KEY UPDATE
+                                    filer_type = VALUES(filer_type),
+                                    entity_name = VALUES(entity_name)
+                            `;
+                            dbPromises.push(common.runQuery('POC', feedsFileCikQuery, [
+                                feedDate, filename, entityData.cik, filerType, entityData.conformed_name
+                            ]));
+                        }
+                    });
+                }
+            };
+
+            // Process regular filers (type 'F')
+            processFilers(jsonMetaData.filer, 'F');
+            
+            // Process reporting owners (type 'R')
+            processFilers(jsonMetaData.reporting_owner, 'R');
+            
+            // Process issuers (type 'I')
+            if(jsonMetaData.issuer) processFilers([jsonMetaData.issuer], 'I');
+            
+            // Process series and classes from series_and_classes_contracts_data
+            if (jsonMetaData.series_and_classes_contracts_data && Array.isArray(jsonMetaData.series_and_classes_contracts_data)) {
+                jsonMetaData.series_and_classes_contracts_data.forEach(item => {
+                    // Process series
+                    if (item.series && Array.isArray(item.series)) {
+                        item.series.forEach(series => {
+                            if (series.series_id && series.series_name) {
+                                const feedsFileSeriesQuery = `
+                                    INSERT INTO feeds_file_series (
+                                        feeds_date, feeds_file, cik, series_id, series_name
+                                    ) VALUES (?, ?, ?, ?, ?)
+                                    ON DUPLICATE KEY UPDATE
+                                        series_name = VALUES(series_name)
+                                `;
+                                dbPromises.push(common.runQuery('POC', feedsFileSeriesQuery, [
+                                    feedDate, filename, series.cik || null, series.series_id, series.series_name
+                                ]));
+                            }
+                        });
+                    }
+                    
+                    // Process classes
+                    if (item.class_contract && Array.isArray(item.class_contract)) {
+                        debugger; // Inspect class_contract array
+                        item.class_contract.forEach(classContract => {
+                            debugger; // Inspect each class contract object
+                            if (classContract.class_id && classContract.class_name) {
+                                const feedsFileClassQuery = `
+                                    INSERT INTO feeds_file_class (
+                                        feeds_date, feeds_file, cik, series_id, class_id, class_name
+                                    ) VALUES (?, ?, ?, ?, ?, ?)
+                                    ON DUPLICATE KEY UPDATE
+                                        class_name = VALUES(class_name)
+                                `;
+                                dbPromises.push(common.runQuery('POC', feedsFileClassQuery, [
+                                    feedDate, filename, classContract.cik || null, 
+                                    classContract.series_id || null, classContract.class_id, classContract.class_name
+                                ]));
+                            }
+                        });
+                    }
+                });
+            }
+            
+            // Process documents
+            if (jsonMetaData.document && Array.isArray(jsonMetaData.document)) {
+                jsonMetaData.document.forEach((doc, index) => {
+                    if (doc.filename && doc.sequence) {
+                        const feedsFileDocumentQuery = `
+                            INSERT INTO feeds_file_document (
+                                feeds_date, feeds_file, sequence, file_name, file_type, 
+                                file_description, file_size, file_ext
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            ON DUPLICATE KEY UPDATE
+                                file_type = VALUES(file_type),
+                                file_description = VALUES(file_description),
+                                file_size = VALUES(file_size),
+                                file_ext = VALUES(file_ext)
+                        `;           
+                        const fileExt = doc.filename.split('.').pop() || '';
+                        const fileSize = (
+                            submission.docs && submission.docs[index] && submission.docs[index].fileSize 
+                            ? submission.docs[index].fileSize
+                            : null
+                        );
+                        dbPromises.push(common.runQuery('POC', feedsFileDocumentQuery, [
+                            feedDate, filename, doc.sequence, doc.filename, doc.type || '',
+                            doc.description || '', fileSize, fileExt
+                        ]));
+                    }
+                });
+            }
+            
+        } catch (error) {
+            console.error('Error writing feeds metadata:', error);
+        }
+    }
 
     function writeSubmissionHeaderRecords(){
         dbPromises.push(common.runQuery('POC', `insert into efts_submissions (adsh, form, filedt) 
