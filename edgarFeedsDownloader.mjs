@@ -56,7 +56,15 @@ const processControl = {
     startDownloadManager(processControl, function () {
         //this callback is fired when download manager is completely down with all downloads
         console.log('Feeds downloader processing finished', JSON.stringify(processControl));
-        process.exit();  //exit point of this program
+        
+        // Close all database connection pools before exiting
+        common.closeAllPools().then(() => {
+            console.log('Database connection pools closed');
+            process.exit();  //exit point of this program
+        }).catch(error => {
+            console.error('Error closing database pools:', error);
+            process.exit(1);
+        });
     });
 })();
 

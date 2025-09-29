@@ -16,6 +16,9 @@ const sqsClient = new SQSClient({ region: 'us-east-1' });
 let recentSecRequest = false;
 let secRequestTimer = null;
 
+// Database connection pools
+const connectionPools = {};
+
 // S3 Functions
 export const s3ReadString = async (bucket, key) => {
     try {
@@ -177,7 +180,7 @@ export const webFetchFair = async (url) => {
     }
 };
 
-// Database Query Function
+// Database Query Function with Connection Pooling
 export const runQuery = async (db, sql, params = []) => {
     try {
         // Get database configuration
@@ -186,26 +189,32 @@ export const runQuery = async (db, sql, params = []) => {
             throw new Error(`Database configuration not found for: ${db}`);
         }
         
-        // Create connection
-        const connection = await mysql.createConnection({
-            host: dbConfig.SERVER,
-            user: dbConfig.USER,
-            password: dbConfig.PWD,
-            database: dbConfig.DB_NAME
-        });
-        let rows;
-        try {
-            // Execute query
-            [rows] = await connection.execute(sql, params);
-        } finally {
-            // Always close the connection
-            await connection.end();
+        // Get or create connection pool for this database
+        if (!connectionPools[db]) {
+            connectionPools[db] = mysql.createPool({
+                host: dbConfig.SERVER,
+                user: dbConfig.USER,
+                password: dbConfig.PWD,
+                database: dbConfig.DB_NAME,
+                connectionLimit: 10, // Maximum number of connections in the pool
+                queueLimit: 0 // Maximum number of connection requests the pool will queue
+            });
         }
+        
+        // Execute query using the pool
+        const [rows] = await connectionPools[db].execute(sql, params);
         return rows;
     } catch (error) {
         console.log(sql, params);
         throw new Error(`Database Query Error: ${error.message}`);
     }
+};
+
+// Function to close all connection pools
+export const closeAllPools = async () => {
+    const closePromises = Object.values(connectionPools).map(pool => pool.end());
+    await Promise.all(closePromises);
+    Object.keys(connectionPools).forEach(key => delete connectionPools[key]);
 };
 
 //data helper functions
@@ -229,6 +238,7 @@ export const common = {
     sqsWriteMessage,
     webFetchFair,
     runQuery,
+    closeAllPools,
     formatCIK,
     formatSeriesId,
     formatClassId
