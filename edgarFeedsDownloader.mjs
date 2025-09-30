@@ -25,7 +25,7 @@ const processControl = {
     maxQueuedDownloads: 4,  //at 1GB per tar.gz file (expanding to 10GB) and 20 seconds to download, 10s timer stay well below SEC.gov 10 requests per second limit and does not occupy too much disk space
     maxFileIngests: 2,  //internal processes to ingest local files leveraging Node's non-blocking model
     maxRetries: 3,
-    submissionProcessTimout: 1*60*1000,  //1 minutes for one .nc file (10 mintues when debugging)
+    submissionProcessTimout: 2*60*1000,  //1 minutes for one .nc file (10 mintues when debugging)
     downloadProcessTimout: 10*60*1000,  //10 minutes for one gz archive
     retries: {},  // record of retried archive downloads / unzips
     start: new Date("2024-01-01"),  //restart date.  If none, the lesser of the max(filedt) and 2008-01-01 is used
