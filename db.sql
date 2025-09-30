@@ -68,6 +68,7 @@ CREATE TABLE `feeds_file_series` (
   `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'Primary Key as int reduced index size + keeps order found',
   `feeds_date` char(10) DEFAULT NULL COMMENT 'Feeds Date ISO 8601 ',
   `feeds_file` varchar(30) DEFAULT NULL COMMENT 'File Name of untarred feeds source file in Feeds',
+  `is_new` tinyint(6) DEFAULT 0 NOT NULL COMMENT ' 1= new else existing',
   `cik` int(11) DEFAULT NULL COMMENT 'CIK from header',
   `series_id` int(11) DEFAULT NULL COMMENT 'Series ID from header',
   `series_name` varchar(255) DEFAULT NULL COMMENT 'Series Name from header',

@@ -19,6 +19,14 @@ let secRequestTimer = null;
 // Database connection pools
 const connectionPools = {};
 
+// Regex patterns for ID extraction (module-level constants)
+const REGEX_PATTERNS = {
+    CIK: /^(\d{10})$/,
+    SERIES_ID: /^S(\d{9})$/,
+    CLASS_ID: /^C(\d{9})$/,
+    ACCESSION_NUMBER: /^(\d{10})-(\d{2})-(\d{6})$/
+};
+
 // S3 Functions
 export const s3ReadString = async (bucket, key) => {
     try {
@@ -219,14 +227,114 @@ export const closeAllPools = async () => {
 
 //data helper functions
 export const formatCIK = function(unpaddedCIK){ //accept int or string and return string with padded zero
-    return '0'.repeat(10-unpaddedCIK.toString().length) + unpaddedCIK.toString()
+    return formatIndexKey(unpaddedCIK, '');
 }
 export const formatSeriesId = function(intSeriesID){ //accept int or string and return string with padded zero
-    return 'S' +'0'.repeat(9-intSeriesID.toString().length) + intSeriesID.toString()
+    return formatIndexKey(intSeriesID, 'S');
 }
 export const formatClassId = function(intClassID){ //accept int or string and return string with padded zero
-    return 'C' + '0'.repeat(9-intClassID.toString().length) + intClassID.toString()
+    return formatIndexKey(intClassID, 'C');
 }
+
+/**
+ * Formats an ID with optional prefix and left-pads with zeros to 10 characters
+ * @param {number|string} id - The ID to format
+ * @param {string} prefix - Optional prefix ('S' for Series, 'C' for Class, '' for default)
+ * @returns {string} - Formatted ID string
+ * @throws {Error} - If prefix is invalid
+ */
+export const formatIndexKey = function(id, prefix = '') {
+    // Validate prefix
+    if (prefix !== '' && prefix !== 'S' && prefix !== 'C') {
+        throw new Error(`Invalid prefix '${prefix}'. Valid prefixes are '', 'S', or 'C'.`);
+    }
+    
+    const idStr = id.toString();
+    const totalLength = 10;
+    const paddingLength = totalLength - prefix.length - idStr.length;
+    
+    if (paddingLength < 0) {
+        throw new Error(`ID '${id}' with prefix '${prefix}' exceeds maximum length of ${totalLength} characters.`);
+    }
+    
+    return prefix + '0'.repeat(paddingLength) + idStr;
+};
+
+/**
+ * Formats an accession number from an integer
+ * @param {number} accession_int - The accession number as integer
+ * @returns {string} - Formatted accession number (e.g., "0000000000-24-000001")
+ * @throws {Error} - If accession_int or components are <= 0
+ */
+export const formatAccessionNumber = function(accession_int) {
+    if (accession_int <= 0) {
+        throw new Error(`Accession number must be > 0, got: ${accession_int}`);
+    }
+    
+    // Convert to 18-character string with leading zeros
+    const accessionStr = accession_int.toString().padStart(18, '0');
+    
+    // Extract components
+    const cik = accessionStr.substring(0, 10);
+    const year = accessionStr.substring(10, 12);
+    const filingCount = accessionStr.substring(12, 18);
+    
+    // Validate components
+    const cikInt = parseInt(cik, 10);
+    const filingCountInt = parseInt(filingCount, 10);
+    
+    if (cikInt <= 0) {
+        throw new Error(`CIK component must be > 0, got: ${cikInt}`);
+    }
+    
+    if (filingCountInt <= 0) {
+        throw new Error(`Filing count component must be > 0, got: ${filingCountInt}`);
+    }
+    
+    return `${cik}-${year}-${filingCount}`;
+};
+
+/**
+ * Extracts integer ID from formatted string (CIK, Series ID, Class ID, or Accession Number)
+ * @param {string} adshCikSeriesClassId - The formatted ID string
+ * @returns {number} - The extracted integer ID
+ * @throws {Error} - If input doesn't match any of the 4 formats
+ */
+export const extractIntId = function(adshCikSeriesClassId) {
+    if (!adshCikSeriesClassId || typeof adshCikSeriesClassId !== 'string') {
+        throw new Error(`Invalid input: expected string, got ${typeof adshCikSeriesClassId}`);
+    }
+    
+    // Try CIK format (10 digits)
+    let match = adshCikSeriesClassId.match(REGEX_PATTERNS.CIK);
+    if (match) {
+        return parseInt(match[1], 10);
+    }
+    
+    // Try Series ID format (S + 9 digits)
+    match = adshCikSeriesClassId.match(REGEX_PATTERNS.SERIES_ID);
+    if (match) {
+        return parseInt(match[1], 10);
+    }
+    
+    // Try Class ID format (C + 9 digits)
+    match = adshCikSeriesClassId.match(REGEX_PATTERNS.CLASS_ID);
+    if (match) {
+        return parseInt(match[1], 10);
+    }
+    
+    // Try Accession Number format (10-2-6 with dashes)
+    match = adshCikSeriesClassId.match(REGEX_PATTERNS.ACCESSION_NUMBER);
+    if (match) {
+        const cik = match[1];
+        const year = match[2];
+        const filingCount = match[3];
+        const accessionStr = cik + year + filingCount;
+        return parseInt(accessionStr, 10);
+    }
+    
+    throw new Error(`Input '${adshCikSeriesClassId}' does not match any of the 4 valid formats: CIK (10 digits), Series ID (S + 9 digits), Class ID (C + 9 digits), or Accession Number (10-2-6 with dashes)`);
+};
 
 // Export common object with all functions
 export const common = {
@@ -241,5 +349,8 @@ export const common = {
     closeAllPools,
     formatCIK,
     formatSeriesId,
-    formatClassId
+    formatClassId,
+    formatIndexKey,
+    formatAccessionNumber,
+    extractIntId
 };

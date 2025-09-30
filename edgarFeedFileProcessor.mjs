@@ -221,7 +221,7 @@ export async function processFeedFile(processInfo) {
             const isPrivateToPublic = jsonMetaData.private_to_public ? 1 : 0;
             
             // Insert/Update feeds_file table
-            const accessionNumberInt = parseInt(accessionNumber.replace(/-/g, '')) || 0;
+            const accessionNumberInt = accessionNumber ? common.extractIntId(accessionNumber) : 0;
             const feedsFileQuery = `
                 INSERT INTO feeds_file (
                     feeds_date, feeds_file, filing_size, header_1000, adsh, accession_number,
@@ -277,49 +277,62 @@ export async function processFeedFile(processInfo) {
             // Process issuers (type 'I')
             if(jsonMetaData.issuer) processFilers([jsonMetaData.issuer], 'I');
             
-            // Process series and classes from series_and_classes_contracts_data
-            if (jsonMetaData.series_and_classes_contracts_data && Array.isArray(jsonMetaData.series_and_classes_contracts_data)) {
-                jsonMetaData.series_and_classes_contracts_data.forEach(item => {
-                    // Process series
-                    if (item.series && Array.isArray(item.series)) {
-                        item.series.forEach(series => {
-                            if (series.series_id && series.series_name) {
-                                const feedsFileSeriesQuery = `
-                                    INSERT INTO feeds_file_series (
-                                        feeds_date, feeds_file, cik, series_id, series_name
-                                    ) VALUES (?, ?, ?, ?, ?)
-                                    ON DUPLICATE KEY UPDATE
-                                        series_name = VALUES(series_name)
-                                `;
-                                dbPromises.push(common.runQuery('POC', feedsFileSeriesQuery, [
-                                    feedDate, filename, series.cik || null, series.series_id, series.series_name
-                                ]));
-                            }
-                        });
-                    }
-                    
-                    // Process classes
-                    if (item.class_contract && Array.isArray(item.class_contract)) {
-                        debugger; // Inspect class_contract array
-                        item.class_contract.forEach(classContract => {
-                            debugger; // Inspect each class contract object
-                            if (classContract.class_id && classContract.class_name) {
-                                const feedsFileClassQuery = `
-                                    INSERT INTO feeds_file_class (
-                                        feeds_date, feeds_file, cik, series_id, class_id, class_name
-                                    ) VALUES (?, ?, ?, ?, ?, ?)
-                                    ON DUPLICATE KEY UPDATE
-                                        class_name = VALUES(class_name)
-                                `;
-                                dbPromises.push(common.runQuery('POC', feedsFileClassQuery, [
-                                    feedDate, filename, classContract.cik || null, 
-                                    classContract.series_id || null, classContract.class_id, classContract.class_name
-                                ]));
-                            }
-                        });
-                    }
+
+            function processSeriesAndClasses(ContractsSeries, isNew, globalOwnerCik) {
+                ContractsSeries.forEach(series => {
+                    if (series.series_id && series.series_name) {
+                        const feedsFileSeriesQuery = `
+                            INSERT INTO feeds_file_series (
+                                feeds_date, feeds_file, cik, is_new, series_id, series_name
+                            ) VALUES (?, ?, ?, ?, ?, ?)
+                            ON DUPLICATE KEY UPDATE
+                                series_name = VALUES(series_name)`;
+                        dbPromises.push(common.runQuery(
+                            'POC', 
+                            feedsFileSeriesQuery, 
+                            [feedDate, filename, globalOwnerCik || series.owner_cik, isNew, common.extractIntId(series.series_id), series.series_name]
+                        ));
+
+                        // Process classes
+                        if (series.class_contract && Array.isArray(series.class_contract)) {
+                            series.class_contract.forEach(classContract => {
+                                if (classContract.class_contract_id && classContract.class_contract_name) {
+                                    const feedsFileClassQuery = `
+                                        INSERT INTO feeds_file_class (
+                                            feeds_date, feeds_file, cik, series_id, class_id, class_name
+                                        ) VALUES (?, ?, ?, ?, ?, ?)
+                                        ON DUPLICATE KEY UPDATE
+                                            class_name = VALUES(class_name)`;
+                                    dbPromises.push(common.runQuery(
+                                        'POC', 
+                                        feedsFileClassQuery, 
+                                        [feedDate, filename, globalOwnerCik || series.owner_cik, common.extractIntId(series.series_id), common.extractIntId(classContract.class_contract_id), classContract.class_contract_name]
+                                    ));
+                                } else {
+                                    console.error('missing class_id or class_name for class contract', classContract);
+                                }
+                            });
+                        }
+                    } else {
+                        console.error('missing series_id or series_name for series', series);
+                    }    
                 });
             }
+
+            // Process series and classes from series_and_classes_contracts_data
+            if (jsonMetaData.series_and_classes_contracts_data){
+                let seriesData = jsonMetaData.series_and_classes_contracts_data;
+                if(seriesData.existing_series_and_classes_contracts 
+                    && seriesData.existing_series_and_classes_contracts.series 
+                    && Array.isArray(seriesData.existing_series_and_classes_contracts.series)) 
+                        processSeriesAndClasses(seriesData.existing_series_and_classes_contracts.series, 0, seriesData.existing_series_and_classes_contracts.owner_cik);
+                if (seriesData.new_series_and_classes_contracts 
+                    && seriesData.new_series_and_classes_contracts.new_series 
+                    && Array.isArray(seriesData.new_series_and_classes_contracts.new_series)) 
+                        processSeriesAndClasses(seriesData.new_series_and_classes_contracts.new_series, 1, seriesData.new_series_and_classes_contracts.owner_cik);
+            }
+                
+            
             
             // Process documents
             if (jsonMetaData.document && Array.isArray(jsonMetaData.document)) {
