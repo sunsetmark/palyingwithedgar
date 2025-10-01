@@ -1,7 +1,7 @@
-/*listUniqueSgmlPaths.mjs - list unique SGML paths from all SGML files in the /data/filings directory (as extracted from feeds by edgarFeedDownloader.mjs).
-The uniques SGML paths found by this script are written to sgml_paths.json.
+/*listUniqueSgmlPaths.mjs - list unique SGML paths from all SGML files in the /data/filings subdirectories (as extracted from feeds by edgarFeedDownloader.mjs).
+The unique SGML paths found by this script are written to sgml_paths.json.
 
-Analysis of results from 2024Q1 files:
+Analysis of results from 2024Q1 submissions:
 1. seeminly abitrary use of <SEC-HEADER> vs. <SUBMISSION> root tags
 2. 300 discrete paths to data, when ignoring the root tag differences between "SEC-HEADER" and "SUBMISSION"
 3. 22 entity tags are children of the following 11 paths (226/300 = 74% of the data-bearing paths):
@@ -17,7 +17,10 @@ Analysis of results from 2024Q1 files:
     j. SUBMISSION > ISSUER (18/22) - Missing: FILING-VALUES > ACT, FILING-VALUES > FILE-NUMBER, FILING-VALUES > FILM-NUMBER, FILING-VALUES > FORM-TYPE
     k. SUBMISSION > UNDERWRITER (17/22) - Missing: BUSINESS-ADDRESS > STREET2, FILING-VALUES > FILE-NUMBER, FILING-VALUES > FILM-NUMBER, FORMER-COMPANY : DATE-CHANGED, FORMER-COMPANY : FORMER-CONFORMED-NAME
 
+Another 45 paths reporesent properties of the submission (exclusive to the 22 entity tags).  (Together these can be persisted as 67 submission table fields).
+Series and class contracts use 27 paths.
 
+All toghter, these account for 226+45+27 = 298 of the 300 paths!
 */
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
@@ -69,6 +72,19 @@ function processSgmlFile(filePath) {
     try {
         const content = readFileSync(filePath, 'utf8');
         const lines = content.split(/\r\n|\n|\r/);
+        
+        // Find the <TYPE> line, get the form type, and extract root form type 
+        const typeLine = lines.find(line => line.startsWith('<TYPE>'));
+        let form = null, rootForm = null;
+        if (typeLine) {
+            form = typeLine.substring('<TYPE>'.length)
+            rootForm = form.split('/A').shift();
+            //console.log(`Found form type ${form} in ${filePath}`);
+        }
+        if(!typeLine || !rootForm) {
+            console.log(`No <TYPE> line found in ${filePath}`);
+            return;
+        }
         
         // Start with empty tagsFromRoot for each SGML file
         const tagsFromRoot = []; // Stack to track current path
@@ -153,8 +169,23 @@ function processSgmlFile(filePath) {
         
         // Add new paths to global array
         for (const path of currentPaths) {
-            if (!sgmlPaths.includes(path)) {
-                sgmlPaths.push(path);
+            // Check if path already exists using some() to compare first item
+            const existingPathIndex = sgmlPaths.findIndex(item => item.path === path);
+            
+            if (existingPathIndex === -1) {
+                // Path doesn't exist, add new entry
+                sgmlPaths.push({
+                    path: path,
+                    formTypes: [rootForm]
+                });
+            } else {
+                // Path exists, check if form type is already in the array
+                const formTypes = sgmlPaths[existingPathIndex].formTypes;
+                if (!formTypes.includes(rootForm)) {
+                    formTypes.push(rootForm);
+                    // Keep form types sorted
+                    formTypes.sort();
+                }
             }
         }
         
@@ -195,7 +226,7 @@ async function main() {
         //console.log(`Found ${subfolders.length} subfolders to process`);
         
         for (const subfolder of subfolders) {
-            if (processedFoldersCount >= 1000* 1000) {
+            if (processedFoldersCount >= 1000*1000) {
                 console.log('Reached limit of 1000,000 folders, breaking...');
                 break;
             }
@@ -222,8 +253,8 @@ async function main() {
             }
         }
         
-        // Sort paths alphabetically
-        sgmlPaths.sort();
+        // Sort paths alphabetically by path name
+        sgmlPaths.sort((a, b) => a.path.localeCompare(b.path));
         
         // Write results to file
         writeFileSync('sgml_paths.json', JSON.stringify(sgmlPaths, null, 2));
@@ -233,12 +264,13 @@ async function main() {
         console.log(`Total unique paths found: ${sgmlPaths.length}`);
         console.log(`Processed SGML files: ${processedSgmlFilesCount}`);
         console.log(`Processed folders: ${processedFoldersCount}`);
-        console.log(`Execution time: ${Date.now() - startTime}ms`);
+        console.log(`Execution time: ${(Date.now() - startTime)/1000}s`);
         
+        /*
         console.log('\n=== ALL UNIQUE PATHS ===');
-        sgmlPaths.forEach((path, index) => {
-            console.log(`${index + 1}. ${path}`);
-        });
+        sgmlPaths.forEach((item, index) => {
+            console.log(`${index + 1}. ${item.path} (Form Types: ${item.formTypes.join(', ')})`);
+        }); */
         
     } catch (error) {
         console.error('Error in main function:', error.message);

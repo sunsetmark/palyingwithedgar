@@ -221,17 +221,16 @@ export async function processFeedFile(processInfo) {
             const isPrivateToPublic = jsonMetaData.private_to_public ? 1 : 0;
             
             // Insert/Update feeds_file table
-            const accessionNumberInt = accessionNumber ? common.extractIntId(accessionNumber) : 0;
+            //const accessionNumberInt = accessionNumber ? common.extractIntId(accessionNumber) : 0;  too big int for node to handle!
             const feedsFileQuery = `
                 INSERT INTO feeds_file (
-                    feeds_date, feeds_file, filing_size, adsh, accession_number,
+                    feeds_date, feeds_file, filing_size, adsh,
                     filing_date, form_type, is_correspondence, is_deletion, 
                     is_correction, is_private_to_public
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     filing_size = VALUES(filing_size),
                     adsh = VALUES(adsh),
-                    accession_number = VALUES(accession_number),
                     filing_date = VALUES(filing_date),
                     form_type = VALUES(form_type),
                     is_correspondence = VALUES(is_correspondence),
@@ -241,11 +240,11 @@ export async function processFeedFile(processInfo) {
             `;
             
             dbPromises.push(common.runQuery('POC', feedsFileQuery, [
-                feedDate, filename, filingSize, accessionNumber, accessionNumberInt,
+                feedDate, filename, filingSize, accessionNumber,
                 filingDate, formType, isCorrespondence, isDeletion, isCorrection, isPrivateToPublic
             ]));
             
-            // Process filers (CIKs) - both filer and reporting_owner types
+            //START:  PROCESS ENTITIES ASSOCIATED WITH SUBMISSION 
             const processFilers = (filers, filerType) => {
                 if (filers && Array.isArray(filers)) {
                     filers.forEach((filer, index) => {
@@ -267,35 +266,31 @@ export async function processFeedFile(processInfo) {
                 }
             };
 
-            'F|R|I|SC|D|S|FF|IE|FB|U   for filer|reporter|issuer|subject_company|DEPOSITOR|SECURITIZER|FILED-FOR|ISSUING_ENTITY|FILED-BY|ISSUER|UNDERWRITER'
+            const associatedEntityTypes = {  //all the sneaky properties / arrays where filer data is stored
+                'filer': 'F',
+                'reporting_owner': 'RO',
+                'issuer': 'I',
+                'subject_company': 'SC',
+                'depositor': 'D',  //<DEPOSITOR>
+                'securitizer': 'S',  //<SECURITIZER>
+                'filed_for': 'FF',  //<FILED-FOR>
+                'issuing_entity': 'IE',  //<ISSUING_ENTITY>
+                'filed_by': 'FB',  //<FILED-BY>
+                'underwriter': 'U'  //<UNDERWRITER>
+            };
 
-            // Process regular filers (type 'F')
-            processFilers(jsonMetaData.filer, 'F');
-            
-            // Process reporting owners (type 'R')
-            processFilers(jsonMetaData.reporting_owner, 'R');
-            
-            // Process reporting owners (type 'R')
-            processFilers(jsonMetaData.subject_company, 'SC');
-            
-            // Process reporting owners (type 'R')
-            processFilers(jsonMetaData.reporting_owner, 'R');
-            
-            // Process issuers (type 'I')
-            if(jsonMetaData.issuer) processFilers([jsonMetaData.issuer], 'I');
-            // Process DEPOSITOR (type 'D')
-            if(jsonMetaData.depositor) processFilers([jsonMetaData.depositor], 'D');
-            // Process securitizer (type 'S')
-            if(jsonMetaData.securitizer) processFilers([jsonMetaData.securitizer], 'S');
-            // Process FILED-FOR (type 'FF')
-            if(jsonMetaData.filed_for) processFilers([jsonMetaData.filed_for], 'FF');
-            // Process ISSUING_ENTITY (type 'IE')
-            if(jsonMetaData.issuing_entity) processFilers([jsonMetaData.issuing_entity], 'IE');
-            // Process FILED-BY (type 'FB')
-            if(jsonMetaData.filed_by) processFilers([jsonMetaData.filed_by], 'FB');
-            // Process UNDERWRITER (type 'U')
-            if(jsonMetaData.underwriter) processFilers([jsonMetaData.underwriter], 'U');
+            associatedEntityTypes.forEach((filerType, index) => {
+                if(jsonMetaData[filerType]) {
+                    if(Array.isArray(jsonMetaData[filerType])) {
+                        processFilers(jsonMetaData[filerType], filerType);
+                    } else {
+                        processFilers([jsonMetaData[filerType]], filerType);
+                    }
+                }
+            });
+            //END:  PROCESS ENTITIES ASSOCIATED WITH SUBMISSION 
 
+            //START:  PROCESS SERIES AND CLASSES ASSOCIATED WITH SUBMISSION 
             function processSeriesAndClasses(ContractsSeries, isNew, globalOwnerCik) {
                 ContractsSeries.forEach(series => {
                     if (series.series_id && series.series_name) {
@@ -349,10 +344,10 @@ export async function processFeedFile(processInfo) {
                     && Array.isArray(seriesData.new_series_and_classes_contracts.new_series)) 
                         processSeriesAndClasses(seriesData.new_series_and_classes_contracts.new_series, 1, seriesData.new_series_and_classes_contracts.owner_cik);
             }
-                
+            //END:  PROCESS SERIES AND CLASSES ASSOCIATED WITH SUBMISSION 
             
             
-            // Process documents
+            //START:  PROCESS DOCUMENTS METADATA
             if (jsonMetaData.document && Array.isArray(jsonMetaData.document)) {
                 jsonMetaData.document.forEach((doc, index) => {
                     if (doc.filename && doc.sequence) {
@@ -380,6 +375,7 @@ export async function processFeedFile(processInfo) {
                     }
                 });
             }
+            //END:  PROCESS DOCUMENTS METADATA
             
         } catch (error) {
             console.error('Error writing feeds metadata:', error);
