@@ -212,7 +212,7 @@ export async function processFeedFile(processInfo) {
             const filingSize = submission.docs.reduce((total, doc) => total + (doc.fileLength || 0), 0);
             
             // Extract header information (first 100 characters of SGML)
-            const header1000 = sgmlLines.join('\n').substring(0, 1999);
+            //const header1000 = sgmlLines.join('\n').substring(0, 1999);  rather than save to db, use grep file 
             
             // Determine boolean flags based on metadata
             const isCorrespondence = jsonMetaData.correspondence ? 1 : 0;
@@ -224,13 +224,12 @@ export async function processFeedFile(processInfo) {
             const accessionNumberInt = accessionNumber ? common.extractIntId(accessionNumber) : 0;
             const feedsFileQuery = `
                 INSERT INTO feeds_file (
-                    feeds_date, feeds_file, filing_size, header_1000, adsh, accession_number,
+                    feeds_date, feeds_file, filing_size, adsh, accession_number,
                     filing_date, form_type, is_correspondence, is_deletion, 
                     is_correction, is_private_to_public
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     filing_size = VALUES(filing_size),
-                    header_1000 = VALUES(header_1000),
                     adsh = VALUES(adsh),
                     accession_number = VALUES(accession_number),
                     filing_date = VALUES(filing_date),
@@ -242,7 +241,7 @@ export async function processFeedFile(processInfo) {
             `;
             
             dbPromises.push(common.runQuery('POC', feedsFileQuery, [
-                feedDate, filename, filingSize, header1000, accessionNumber, accessionNumberInt,
+                feedDate, filename, filingSize, accessionNumber, accessionNumberInt,
                 filingDate, formType, isCorrespondence, isDeletion, isCorrection, isPrivateToPublic
             ]));
             
@@ -268,15 +267,34 @@ export async function processFeedFile(processInfo) {
                 }
             };
 
+            'F|R|I|SC|D|S|FF|IE|FB|U   for filer|reporter|issuer|subject_company|DEPOSITOR|SECURITIZER|FILED-FOR|ISSUING_ENTITY|FILED-BY|ISSUER|UNDERWRITER'
+
             // Process regular filers (type 'F')
             processFilers(jsonMetaData.filer, 'F');
             
             // Process reporting owners (type 'R')
             processFilers(jsonMetaData.reporting_owner, 'R');
             
+            // Process reporting owners (type 'R')
+            processFilers(jsonMetaData.subject_company, 'SC');
+            
+            // Process reporting owners (type 'R')
+            processFilers(jsonMetaData.reporting_owner, 'R');
+            
             // Process issuers (type 'I')
             if(jsonMetaData.issuer) processFilers([jsonMetaData.issuer], 'I');
-            
+            // Process DEPOSITOR (type 'D')
+            if(jsonMetaData.depositor) processFilers([jsonMetaData.depositor], 'D');
+            // Process securitizer (type 'S')
+            if(jsonMetaData.securitizer) processFilers([jsonMetaData.securitizer], 'S');
+            // Process FILED-FOR (type 'FF')
+            if(jsonMetaData.filed_for) processFilers([jsonMetaData.filed_for], 'FF');
+            // Process ISSUING_ENTITY (type 'IE')
+            if(jsonMetaData.issuing_entity) processFilers([jsonMetaData.issuing_entity], 'IE');
+            // Process FILED-BY (type 'FB')
+            if(jsonMetaData.filed_by) processFilers([jsonMetaData.filed_by], 'FB');
+            // Process UNDERWRITER (type 'U')
+            if(jsonMetaData.underwriter) processFilers([jsonMetaData.underwriter], 'U');
 
             function processSeriesAndClasses(ContractsSeries, isNew, globalOwnerCik) {
                 ContractsSeries.forEach(series => {

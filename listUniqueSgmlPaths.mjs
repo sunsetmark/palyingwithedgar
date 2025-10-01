@@ -1,3 +1,24 @@
+/*listUniqueSgmlPaths.mjs - list unique SGML paths from all SGML files in the /data/filings directory (as extracted from feeds by edgarFeedDownloader.mjs).
+The uniques SGML paths found by this script are written to sgml_paths.json.
+
+Analysis of results from 2024Q1 files:
+1. seeminly abitrary use of <SEC-HEADER> vs. <SUBMISSION> root tags
+2. 300 discrete paths to data, when ignoring the root tag differences between "SEC-HEADER" and "SUBMISSION"
+3. 22 entity tags are children of the following 11 paths (226/300 = 74% of the data-bearing paths):
+    a. SEC-HEADER > FILER (original reference)
+    b. SUBMISSION > FILER
+    c. SUBMISSION > REPORTING-OWNER
+    d. SUBMISSION > SUBJECT-COMPANY
+    e. SUBMISSION > DEPOSITOR (21/22) - Missing: FILING-VALUES > FILM-NUMBER
+    f. SUBMISSION > SECURITIZER (21/22) - Missing: FILING-VALUES > FILM-NUMBER
+    g. SUBMISSION > FILED-FOR (20/22) - Missing: FILING-VALUES > ACT, FILING-VALUES > FILM-NUMBER
+    h. SUBMISSION > ISSUING_ENTITY (20/22) - Missing: FILING-VALUES > FILE-NUMBER, FILING-VALUES > FILM-NUMBER
+    i. SUBMISSION > FILED-BY (19/22) - Missing: FILING-VALUES > ACT, FILING-VALUES > FILE-NUMBER, FILING-VALUES > FILM-NUMBER
+    j. SUBMISSION > ISSUER (18/22) - Missing: FILING-VALUES > ACT, FILING-VALUES > FILE-NUMBER, FILING-VALUES > FILM-NUMBER, FILING-VALUES > FORM-TYPE
+    k. SUBMISSION > UNDERWRITER (17/22) - Missing: BUSINESS-ADDRESS > STREET2, FILING-VALUES > FILE-NUMBER, FILING-VALUES > FILM-NUMBER, FORMER-COMPANY : DATE-CHANGED, FORMER-COMPANY : FORMER-CONFORMED-NAME
+
+
+*/
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 

@@ -26,9 +26,7 @@ CREATE TABLE `feeds_file` (
   `feeds_date` char(10) NOT NULL COMMENT 'Feeds Date (yyyymmdd)',
   `feeds_file` varchar(30) NOT NULL COMMENT 'File Name in Feeds',
   `filing_size` int(11) DEFAULT NULL COMMENT 'Filing Size in bytes',
-  `header_1000` varchar(1000) DEFAULT NULL COMMENT 'First 1000 characters of file''s SGML header',
   `adsh` char(20) NOT NULL COMMENT 'Accession Number with dashes',
-  `accession_number` BIGINT UNSIGNED NOT NULL COMMENT 'Accession Number as int (dashes removed)',
   `filing_date` char(10) DEFAULT NULL COMMENT 'Filing Date from header',
   `form_type` VARCHAR(50) DEFAULT NULL COMMENT 'Form Type (principal) from header',
   `is_correspondence` tinyint(1) DEFAULT NULL COMMENT 'Is Correspndance',
@@ -53,7 +51,7 @@ CREATE TABLE `feeds_file_cik` (
   `feeds_date` char(10) DEFAULT NULL COMMENT 'Feeds Date (yyyymmdd)',
   `feeds_file` varchar(30) DEFAULT NULL COMMENT 'File Name of untarred feeds source file',
   `cik` int(11) DEFAULT NULL COMMENT 'CIK from header',
-  `filer_type` CHAR(1) DEFAULT 'F' COMMENT 'F|R|I filer|reporter|issuer',
+  `filer_type` VARCHAR(2) COMMENT 'F|R|I|SC|D|S|FF|IE|FB|U  for filer|reporter|issuer|subject_company|DEPOSITOR|SECURITIZER|FILED-FOR|ISSUING_ENTITY|FILED-BY|ISSUER|UNDERWRITER',
   `entity_name` varchar(255) DEFAULT NULL COMMENT 'Entity Name from header',
   PRIMARY KEY (`id`),
   UNIQUE KEY `udx_feeds_file_cik` (`feeds_date`,`feeds_file`,`cik`,`filer_type`), /*not sure if filer_type is needed */
