@@ -226,7 +226,7 @@ async function main() {
         //console.log(`Found ${subfolders.length} subfolders to process`);
         
         for (const subfolder of subfolders) {
-            if (processedFoldersCount >= 1000*1000) {
+            if (processedFoldersCount >= 1000 * 1000) {
                 console.log('Reached limit of 1000,000 folders, breaking...');
                 break;
             }

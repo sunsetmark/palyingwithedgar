@@ -245,6 +245,19 @@ export async function processFeedFile(processInfo) {
             ]));
             
             //START:  PROCESS ENTITIES ASSOCIATED WITH SUBMISSION 
+            const associatedEntityTypes = {  //all the sneaky properties / arrays where filer data is stored
+                'filer': 'F',
+                'reporting_owner': 'RO',
+                'issuer': 'I',
+                'subject_company': 'SC',
+                'depositor': 'D',  //<DEPOSITOR>
+                'securitizer': 'S',  //<SECURITIZER>
+                'filed_for': 'FF',  //<FILED-FOR>
+                'issuing_entity': 'IE',  //<ISSUING_ENTITY>
+                'filed_by': 'FB',  //<FILED-BY>
+                'underwriter': 'U'  //<UNDERWRITER>
+            };
+
             const processFilers = (filers, filerType) => {
                 if (filers && Array.isArray(filers)) {
                     filers.forEach((filer, index) => {
@@ -266,28 +279,15 @@ export async function processFeedFile(processInfo) {
                 }
             };
 
-            const associatedEntityTypes = {  //all the sneaky properties / arrays where filer data is stored
-                'filer': 'F',
-                'reporting_owner': 'RO',
-                'issuer': 'I',
-                'subject_company': 'SC',
-                'depositor': 'D',  //<DEPOSITOR>
-                'securitizer': 'S',  //<SECURITIZER>
-                'filed_for': 'FF',  //<FILED-FOR>
-                'issuing_entity': 'IE',  //<ISSUING_ENTITY>
-                'filed_by': 'FB',  //<FILED-BY>
-                'underwriter': 'U'  //<UNDERWRITER>
-            };
-
-            associatedEntityTypes.forEach((filerType, index) => {
+            for(const filerType in associatedEntityTypes){
                 if(jsonMetaData[filerType]) {
                     if(Array.isArray(jsonMetaData[filerType])) {
-                        processFilers(jsonMetaData[filerType], filerType);
+                        processFilers(jsonMetaData[filerType], associatedEntityTypes[filerType]);
                     } else {
-                        processFilers([jsonMetaData[filerType]], filerType);
+                        processFilers([jsonMetaData[filerType]], associatedEntityTypes[filerType]);
                     }
                 }
-            });
+            };
             //END:  PROCESS ENTITIES ASSOCIATED WITH SUBMISSION 
 
             //START:  PROCESS SERIES AND CLASSES ASSOCIATED WITH SUBMISSION 
