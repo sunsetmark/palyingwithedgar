@@ -199,7 +199,7 @@ export async function processFeedFile(processInfo) {
                 writeFeedsMetaData(submissionMetadata.submission, processInfo.feedDate, processInfo.name);
             }
             
-            //writeSubmissionHeaderRecords();  //insert queries run async and promises pushed onto dbPromises array
+            writeSubmissionHeaderRecords(submissionMetadata.submission, processInfo.feedDate, processInfo.name);  //insert queries run async and promises pushed onto dbPromises array
             messageParentFinished('ok');
         }
     });
@@ -224,8 +224,8 @@ export async function processFeedFile(processInfo) {
             
             // Determine boolean flags based on metadata
             const isCorrespondence = jsonMetaData.correspondence ? 1 : 0;
-            const isDeletion = jsonMetaData.correction === 'DELETION' ? 1 : 0;
-            const isCorrection = jsonMetaData.correction === 'CORRECTION' ? 1 : 0;
+            const isDeletion = jsonMetaData.deletion ? 1 : 0;
+            const isCorrection = jsonMetaData.correction ? 1 : 0;
             const isPrivateToPublic = jsonMetaData.private_to_public ? 1 : 0;
             
             // Insert/Update feeds_file table
@@ -390,25 +390,324 @@ export async function processFeedFile(processInfo) {
         }
     }
 
-    function writeSubmissionHeaderRecords(){
-        dbPromises.push(common.runQuery('POC', `insert into efts_submissions (adsh, form, filedt) 
-            values(${q(submission.adsh)}, ${q(submission.type)}, ${q(submission.filingDate)})
-            on duplicate key update last_indexed = null`));
-        
-            for(let i=0;i<submission.entities.length;i++){
-            let e = submission.entities[i];
-            //type field values: OC=operating co; IC=invest co, RP=reporting person
-            dbPromises.push(common.runQuery('POC', `insert into efts_entities (cik,name,state_inc,type,updatedfromadsh) 
-                values(${e.cik},${q(e.name)},${q(e.incorporationState)}, ${q(e.type)}, ${q(submission.adsh)})
-                on duplicate key update name=${q(e.name)}`));
-            dbPromises.push(common.runQuery('POC', `insert ignore into efts_submissions_entities (cik, adsh) 
-                values(${e.cik},${q(submission.adsh)})`));
-        }
+    /**
+     * Writes submission metadata to submission_* tables
+     * @param {Object} jsonMetaData - The JSON metadata object from SGML processing
+     * @param {string} feedDate - The feed date (YYYYMMDD format)
+     * @param {string} filename - The filename being processed
+     */
+    function writeSubmissionHeaderRecords(jsonMetaData, feedDate, filename) {
+        try {
+            const adsh = jsonMetaData.accession_number || '';
+            if (!adsh) {
+                console.error('Missing accession number in submission metadata');
+                return;
+            }
 
-        entityTickersPromise = common.runQuery('POC', `SELECT cik, group_concat(ticker order by length(ticker), ticker SEPARATOR ', ')  as tickers
-            FROM efts_entity_tickers 
-            WHERE cik in (${submission.ciks.join(',')}) 
-            group by cik`);
+            // Insert main submission record FIRST (must complete before child records)
+            const submissionQuery = `
+                INSERT INTO submission (
+                    adsh, type, public, public_document_count, period, filing_date,
+                    date_of_filing_date_change, effectiveness_date, acceptance_datetime,
+                    file_number, film_number, is_paper
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    type = VALUES(type),
+                    public_document_count = VALUES(public_document_count),
+                    period = VALUES(period),
+                    filing_date = VALUES(filing_date),
+                    date_of_filing_date_change = VALUES(date_of_filing_date_change),
+                    effectiveness_date = VALUES(effectiveness_date),
+                    acceptance_datetime = VALUES(acceptance_datetime),
+                    file_number = VALUES(file_number),
+                    film_number = VALUES(film_number),
+                    is_paper = VALUES(is_paper)
+            `;
+            
+            // Execute submission insert first, then chain the dependent inserts
+            const submissionPromise = common.runQuery('POC', submissionQuery, [
+                adsh,
+                jsonMetaData.type || '',
+                1, // public flag - always 1 for public feeds
+                jsonMetaData.public_document_count || null,
+                jsonMetaData.period || null,
+                jsonMetaData.filing_date || null,
+                jsonMetaData.date_of_filing_date_change || null,
+                jsonMetaData.effectiveness_date || null,
+                jsonMetaData.acceptance_datetime || null,
+                jsonMetaData.file_number || null,
+                jsonMetaData.film_number || null,
+                jsonMetaData.is_paper ? 1 : 0
+            ]).then(() => {
+                // After submission is inserted, insert all dependent records
+                insertDependentRecords(jsonMetaData, feedDate, filename, adsh);
+            });
+            
+            dbPromises.push(submissionPromise);
+            
+        } catch (error) {
+            console.error('Error writing submission metadata:', error);
+        }
+    }
+    
+    /**
+     * Inserts dependent records after submission record is created
+     * @param {Object} jsonMetaData - The JSON metadata object
+     * @param {string} feedDate - The feed date
+     * @param {string} filename - The filename
+     * @param {string} adsh - The accession number
+     */
+    function insertDependentRecords(jsonMetaData, feedDate, filename, adsh) {
+        try {
+
+            // Process entities (filer, issuer, reporting_owner, subject_company, etc.)
+            const associatedEntityTypes = {
+                'filer': 'F',
+                'reporting_owner': 'RO',
+                'issuer': 'I',
+                'subject_company': 'SC',
+                'depositor': 'D',
+                'securitizer': 'S',
+                'filed_for': 'FF',
+                'issuing_entity': 'IE',
+                'filed_by': 'FB',
+                'underwriter': 'U'
+            };
+
+            const processEntities = (entities, filerCode) => {
+                if (!entities) return;
+                const entityArray = Array.isArray(entities) ? entities : [entities];
+                
+                entityArray.forEach(entity => {
+                    const entityData = entity.company_data || entity.owner_data;
+                    if (!entityData || !entityData.cik) return;
+
+                    const filingValues = entity.filing_values || {};
+                    const businessAddr = entity.business_address || {};
+                    const mailAddr = entity.mail_address || {};
+
+                    const entityQuery = `
+                        INSERT INTO submission_entity (
+                            adsh, filer_code, cik, conformed_name, organization_name,
+                            irs_number, state_of_incorporation, fiscal_year_end, assigned_sic,
+                            filing_form_type, filing_act, filing_file_number, filing_film_number,
+                            business_street1, business_street2, business_city, business_state,
+                            business_zip, business_phone,
+                            mail_street1, mail_street2, mail_city, mail_state, mail_zip
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ON DUPLICATE KEY UPDATE
+                            conformed_name = VALUES(conformed_name),
+                            organization_name = VALUES(organization_name),
+                            irs_number = VALUES(irs_number),
+                            state_of_incorporation = VALUES(state_of_incorporation),
+                            fiscal_year_end = VALUES(fiscal_year_end),
+                            assigned_sic = VALUES(assigned_sic),
+                            filing_form_type = VALUES(filing_form_type),
+                            filing_act = VALUES(filing_act),
+                            filing_file_number = VALUES(filing_file_number),
+                            filing_film_number = VALUES(filing_film_number),
+                            business_street1 = VALUES(business_street1),
+                            business_street2 = VALUES(business_street2),
+                            business_city = VALUES(business_city),
+                            business_state = VALUES(business_state),
+                            business_zip = VALUES(business_zip),
+                            business_phone = VALUES(business_phone),
+                            mail_street1 = VALUES(mail_street1),
+                            mail_street2 = VALUES(mail_street2),
+                            mail_city = VALUES(mail_city),
+                            mail_state = VALUES(mail_state),
+                            mail_zip = VALUES(mail_zip)
+                    `;
+
+                    dbPromises.push(common.runQuery('POC', entityQuery, [
+                        adsh, filerCode, entityData.cik, entityData.conformed_name || '',
+                        entityData.organization_name || null,
+                        entityData.irs_number || null,
+                        entityData.state_of_incorporation || null,
+                        entityData.fiscal_year_end || null,
+                        entityData.assigned_sic || null,
+                        filingValues.form_type || null,
+                        filingValues.act || null,
+                        filingValues.file_number || null,
+                        filingValues.film_number || null,
+                        businessAddr.street1 || null,
+                        businessAddr.street2 || null,
+                        businessAddr.city || null,
+                        businessAddr.state || null,
+                        businessAddr.zip || null,
+                        businessAddr.phone || null,
+                        mailAddr.street1 || null,
+                        mailAddr.street2 || null,
+                        mailAddr.city || null,
+                        mailAddr.state || null,
+                        mailAddr.zip || null
+                    ]));
+
+                    // Process former_company array
+                    if (entity.former_company && Array.isArray(entity.former_company)) {
+                        entity.former_company.forEach(former => {
+                            if (former.former_conformed_name && former.date_changed) {
+                                const formerCompanyQuery = `
+                                    INSERT INTO submission_former_company (adsh, cik, former_conformed_name, date_changed)
+                                    VALUES (?, ?, ?, ?)
+                                    ON DUPLICATE KEY UPDATE former_conformed_name = VALUES(former_conformed_name)
+                                `;
+                                dbPromises.push(common.runQuery('POC', formerCompanyQuery, [
+                                    adsh, entityData.cik, former.former_conformed_name, former.date_changed
+                                ]));
+                            }
+                        });
+                    }
+
+                    // Process former_name array (for reporting_owner)
+                    if (entity.former_name && Array.isArray(entity.former_name)) {
+                        entity.former_name.forEach(former => {
+                            if (former.former_conformed_name && former.date_changed) {
+                                const formerNameQuery = `
+                                    INSERT INTO submission_former_name (adsh, cik, former_conformed_name, date_changed)
+                                    VALUES (?, ?, ?, ?)
+                                    ON DUPLICATE KEY UPDATE former_conformed_name = VALUES(former_conformed_name)
+                                `;
+                                dbPromises.push(common.runQuery('POC', formerNameQuery, [
+                                    adsh, entityData.cik, former.former_conformed_name, former.date_changed
+                                ]));
+                            }
+                        });
+                    }
+                });
+            };
+
+            // Process all entity types
+            for (const [entityType, filerCode] of Object.entries(associatedEntityTypes)) {
+                if (jsonMetaData[entityType]) {
+                    processEntities(jsonMetaData[entityType], filerCode);
+                }
+            }
+
+            // Process documents
+            if (jsonMetaData.document && Array.isArray(jsonMetaData.document)) {
+                jsonMetaData.document.forEach(doc => {
+                    if (doc.filename && doc.sequence) {
+                        const documentQuery = `
+                            INSERT INTO submission_document (adsh, sequence, type, filename, description)
+                            VALUES (?, ?, ?, ?, ?)
+                            ON DUPLICATE KEY UPDATE
+                                type = VALUES(type),
+                                filename = VALUES(filename),
+                                description = VALUES(description)
+                        `;
+                        dbPromises.push(common.runQuery('POC', documentQuery, [
+                            adsh,
+                            parseInt(doc.sequence),
+                            doc.type || null,
+                            doc.filename,
+                            doc.description || null
+                        ]));
+                    }
+                });
+            }
+
+            // Process series and classes
+            if (jsonMetaData.series_and_classes_contracts_data) {
+                const seriesData = jsonMetaData.series_and_classes_contracts_data;
+                
+                const processSeries = (seriesArray, isNew, globalOwnerCik) => {
+                    if (!seriesArray || !Array.isArray(seriesArray)) return;
+                    
+                    seriesArray.forEach(series => {
+                        if (series.series_id && series.series_name) {
+                            const seriesIdBigint = common.extractIntId(series.series_id);
+                            const ownerCik = globalOwnerCik || series.owner_cik;
+                            
+                            const seriesQuery = `
+                                INSERT INTO submission_series (adsh, series_id, owner_cik, series_name, is_new)
+                                VALUES (?, ?, ?, ?, ?)
+                                ON DUPLICATE KEY UPDATE
+                                    owner_cik = VALUES(owner_cik),
+                                    series_name = VALUES(series_name),
+                                    is_new = VALUES(is_new)
+                            `;
+                            
+                            // Insert series first, then insert class contracts
+                            const seriesPromise = common.runQuery('POC', seriesQuery, [
+                                adsh, seriesIdBigint, ownerCik, series.series_name, isNew ? 1 : 0
+                            ]).then(() => {
+                                // Process class contracts after series is inserted
+                                if (series.class_contract && Array.isArray(series.class_contract)) {
+                                    series.class_contract.forEach(classContract => {
+                                        if (classContract.class_contract_id && classContract.class_contract_name) {
+                                            const classIdBigint = common.extractIntId(classContract.class_contract_id);
+                                            
+                                            const classQuery = `
+                                                INSERT INTO submission_class_contract (
+                                                    adsh, series_id, class_contract_id, class_contract_name,
+                                                    class_contract_ticker_symbol
+                                                ) VALUES (?, ?, ?, ?, ?)
+                                                ON DUPLICATE KEY UPDATE
+                                                    class_contract_name = VALUES(class_contract_name),
+                                                    class_contract_ticker_symbol = VALUES(class_contract_ticker_symbol)
+                                            `;
+                                            dbPromises.push(common.runQuery('POC', classQuery, [
+                                                adsh, seriesIdBigint, classIdBigint,
+                                                classContract.class_contract_name,
+                                                classContract.class_contract_ticker_symbol || null
+                                            ]));
+                                        }
+                                    });
+                                }
+                            });
+                            
+                            dbPromises.push(seriesPromise);
+                        }
+                    });
+                };
+
+                // Process existing and new series
+                if (seriesData.existing_series_and_classes_contracts) {
+                    processSeries(
+                        seriesData.existing_series_and_classes_contracts.series,
+                        false,
+                        seriesData.existing_series_and_classes_contracts.owner_cik
+                    );
+                }
+                if (seriesData.new_series_and_classes_contracts) {
+                    processSeries(
+                        seriesData.new_series_and_classes_contracts.new_series,
+                        true,
+                        seriesData.new_series_and_classes_contracts.owner_cik
+                    );
+                }
+            }
+
+            // Process items (for 8-K and other forms)
+            if (jsonMetaData.item && Array.isArray(jsonMetaData.item)) {
+                jsonMetaData.item.forEach(item => {
+                    if (item) {
+                        const itemQuery = `
+                            INSERT INTO submission_item (adsh, item_code)
+                            VALUES (?, ?)
+                            ON DUPLICATE KEY UPDATE item_code = VALUES(item_code)
+                        `;
+                        dbPromises.push(common.runQuery('POC', itemQuery, [adsh, item]));
+                    }
+                });
+            } else if (jsonMetaData.items && Array.isArray(jsonMetaData.items)) {
+                // Handle ITEMS tag (plural)
+                jsonMetaData.items.forEach(item => {
+                    if (item) {
+                        const itemQuery = `
+                            INSERT INTO submission_item (adsh, item_code)
+                            VALUES (?, ?)
+                            ON DUPLICATE KEY UPDATE item_code = VALUES(item_code)
+                        `;
+                        dbPromises.push(common.runQuery('POC', itemQuery, [adsh, item]));
+                    }
+                });
+            }
+
+        } catch (error) {
+            console.error('Error writing submission metadata:', error);
+        }
     }
 
 

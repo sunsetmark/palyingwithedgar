@@ -24,6 +24,7 @@ const SGML_ARRAY_TAGS = [
 const SGML_FLAG_TAGS = [ //these do not have data so otherwise they would have value of "" which is falsey.  Tags is these array will be set to true.
     'correction',
     'deletion',
+    'private_to_public',
 ];
 /**
  * Converts SGML tag name to JSON property name (which is also the db field name) 
