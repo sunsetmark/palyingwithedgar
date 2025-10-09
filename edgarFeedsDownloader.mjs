@@ -15,21 +15,22 @@ const FEED_PROCESS_FILE = './edgarFeedFileProcessor.mjs';
 //const execAsync = promisify(exec);
 
 // Configuration
-const debugAdsh = false; //if a string (truthy) is provided, only process a source filenames containing this string, leaving sourcing files for inspection:  if false, process all
+const debugAdsh = true; //if a string (truthy) is provided, only process a source filenames containing this string, leaving sourcing files for inspection:  if false, process all
 const processControl = {
+    useExistingFiles: true,
     debugAdsh: debugAdsh,
     leaveSourceFiles: false || debugAdsh,
     writeExtractedFiles: false,
     writeSgmlMetaDataFiles: true,
     writeJsonMetaDataFiles: true,
-    maxQueuedDownloads: 4,  //at 1GB per tar.gz file (expanding to 10GB) and 20 seconds to download, 10s timer stay well below SEC.gov 10 requests per second limit and does not occupy too much disk space
+    maxQueuedDownloads: 3,  //at 1GB per tar.gz file (expanding to 10GB) and 20 seconds to download, 10s timer stay well below SEC.gov 10 requests per second limit and does not occupy too much disk space
     maxFileIngests: 2,  //internal processes to ingest local files leveraging Node's non-blocking model
     maxRetries: 3,
     submissionProcessTimout: 2*60*1000,  //1 minutes for one .nc file (10 mintues when debugging)
-    downloadProcessTimout: 10*60*1000,  //10 minutes for one gz archive
+    downloadProcessTimout: 15*60*1000,  //10 minutes for one gz archive (some current archives are 8GB compressed)
     retries: {},  // record of retried archive downloads / unzips
-    start: new Date("2024-04-01"),  //restart date.  If none, the lesser of the max(filedt) and 2008-01-01 is used
-    end: new Date("2024-06-30"), //if false or not set, scrape continues up to today
+    start: new Date("2024-04-08"),  //restart date.  If none, the lesser of the max(filedt) and 2008-01-01 is used
+    end: new Date("2024-04-08"), //if false or not set, scrape continues up to today
     days: [
     ], //ingest specific days (also used as retry queue) e.g. ['2013-08-12', '2013-08-14', '2013-11-13', '2013-11-15', '2014-03-04', '2014-08-04', '2014-11-14', '2015-03-31','2015-04-30', '2016-02-18', '2016-02-26', '2016-02-29', '2017-02-24', '2017-02-28', '2017-04-27','2017-05-10', '2017-08-03', '2017-08-04', '2017-08-08', '2017-10-16', '2017-10-23', '2017-10-30', '2017-11-03','2017-11-06', '2017-12-20', '2018-04-26', '2018-04-27', '2018-04-30', '2018-05-01', '2018-11-14']],
     processes: {},
@@ -48,27 +49,6 @@ const processControl = {
     await asyncExec("sudo chmod 777 /data");
     await asyncExec("sudo mkdir -p -m 777 " + processControl.feedsDir); //write the feed tar-balls and expand them in date subdirs
 
-    //2. clear the any remains from the last feeds processing in the feeds directory
-    await asyncExec('rm -r ' + processControl.feedsDir + '*'); 
-    await asyncExec("sudo mkdir -p -m 777 " + processControl.filingsDir);   //write the extracted SGML feed here
-
-    //4. start the download manager
-    startDownloadManager(processControl, function () {
-        //this callback is fired when download manager is completely down with all downloads
-        console.log('Feeds downloader processing finished', JSON.stringify(processControl));
-        
-        // Close all database connection pools before exiting
-        common.closeAllPools().then(() => {
-            console.log('Database connection pools closed');
-            process.exit();  //exit point of this program
-        }).catch(error => {
-            console.error('Error closing database pools:', error);
-            process.exit(1);
-        });
-    });
-})();
-
-async function startDownloadManager(processControl, startDownloadManagerCallback) { //body of program (called only once)
     //initialize process counts
     processControl.dailyArchivesProcessed = 0;
     processControl.activeDownloads = {}; //clear references to activeDownloads
@@ -86,6 +66,41 @@ async function startDownloadManager(processControl, startDownloadManagerCallback
     processControl.processedDocumentCount = 0;
     processControl.paths = {}; //distinct SGL property paths and max use of each path within a single submission
 
+    //2. clear the any remains from the last feeds processing in the feeds directory
+    if(!processControl.useExistingFiles) {
+        await asyncExec('rm -r ' + processControl.feedsDir + '*'); 
+        await asyncExec("sudo mkdir -p -m 777 " + processControl.filingsDir);   //write the extracted SGML feed here
+
+        //4. start the download manager
+        startDownloadManager(processControl, function () {
+            //this callback is fired when download manager is completely down with all downloads
+            console.log('Feeds downloader processing finished', JSON.stringify(processControl));
+            
+            // Close all database connection pools before exiting
+            common.closeAllPools().then(() => {
+                console.log('Database connection pools closed');
+                process.exit();  //exit point of this program
+            }).catch(error => {
+                console.error('Error closing database pools:', error);
+                process.exit(1);
+            });
+        });
+    } else {
+        processControl.activeDownloads.d1 = {
+            status: 'unarchived',
+            archiveDate: processControl.start,
+            archiveName: processControl.start.toISOString().substr(0, 10).replace(/-/g, ''),
+            url: "https://www.sec.gov/Archives/edgar/Feed/2024/QTR1/20240408.nc.tar.gz",
+            timeStamp: Date.now()
+        };
+        indexDirectory(processControl, 1, ()=>{
+            common.closeAllPools().then(()=>{process.exit();});
+        });
+    }
+   
+})();
+
+async function startDownloadManager(processControl, startDownloadManagerCallback) { //body of program (called only once)
     var ingestingFlag = false;  //important state flag must be set at start of ingest and cleared when finished
     var tick = 0;
     var downloadOverSeer;
@@ -102,7 +117,7 @@ async function startDownloadManager(processControl, startDownloadManagerCallback
                 || processControl.activeDownloads["d" + d].status=='untar error' || processControl.activeDownloads["d" + d].status=='download error') { //start new download process
                 downloadDate = nextWeekday();
                 if(downloadDate) {
-                    console.log(downloadDate);
+                    //console.log(downloadDate);
                     downloadingCount++;
                     downloadAndUntarDailyArchive(d, downloadDate, function(downloadControl){//callback invoked by "downloadDailyArchiveCallback" in subroutine
                         if(downloadControl.status=='untar error' || downloadControl.status=='download error'){
@@ -201,7 +216,7 @@ async function startDownloadManager(processControl, startDownloadManagerCallback
             const curlCmd = `curl "${url}" --compressed -H "Host: www.sec.gov" -H "User-Agent: ${config.SEC_USER_AGENT}" -q -o ${archiveFilePath}`; 
             //console.log(Date.now()+':  Executing ' + curlCmd);
             exec(curlCmd).on('exit', function(code){
-                if(code===null) console.log('ElasticSearch bulk indexer wget returned null for ' + archiveName, curlCmd);
+                if(code===null) console.log('ElasticSearch bulk indexer curl returned null for ' + archiveName, curlCmd);
                 if(code){
                     console.log('ElasticSearch bulk indexer unable to download archive (federal holiday?) code: ' + code, archiveName + ' ('+curlCmd+')');
                     downloadControl.status = '504';
@@ -383,7 +398,7 @@ function indexDirectory(processControl, downloadNum, ingestDirectoryCallback){
                 for(let path in result.paths){ //analytics disabled and not returned, so loop doesn't execute
                     processControl.paths[path] = Math.max(processControl.paths[path]||0, result.paths[path]);
                 }
-                if(!processControl.leaveSourceFiles) exec(`rm ${directory}/${result.fileName}`);  //remove submission files as processed
+                if(!processControl.leaveSourceFiles) exec(`rm ${directory}/${result.fileName}`);  //remove submission files as processed (reduces disk usage)
             } else {
                 console.log('ERROR from edgarFeedFileProcessor', result, 'processNum ' + (result.processNum ? result.processNum : 'unknown'));
                 console.log('ERROR from edgarFeedFileProcessor', 'processNum ' + (result.processNum ? result.processNum : 'unknown') + JSON.stringify(result));

@@ -37,6 +37,6 @@ export const config = {
     
     // SEC Fair Use Policy settings
     SEC_REQUEST_DELAY: 100, // milliseconds
-    SEC_USER_AGENT: 'Sunset Partners markelbert@gmail.com',
+    SEC_USER_AGENT: 'SGP mark@sunset.partners',
     SEC_HOST: 'www.sec.gov'
 };

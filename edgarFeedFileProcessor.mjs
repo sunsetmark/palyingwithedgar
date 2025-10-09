@@ -41,7 +41,8 @@ let start;
 process.on('message', processFeedFile);
 export async function processFeedFile(processInfo) {
     //debug: console.log('child get the message:', processInfo);
-    const docFilingFolder = processInfo.filingsDir + processInfo.name.split('.').shift() + '/';
+    const adhsFromFileName = processInfo.name.split('.').shift();
+    const docFilingFolder = processInfo.filingsDir + adhsFromFileName + '/';
     if(processInfo.writeExtractedFiles || processInfo.writeSgmlMetaDataFiles || processInfo.writeJsonMetaDataFiles) {
         await execAsync("sudo mkdir -p -m 777 " + docFilingFolder);   //write the extracted SGML feed here
     }
@@ -67,10 +68,17 @@ export async function processFeedFile(processInfo) {
             readState: READ_STATES.INIT,
             metadata: null
         };
+    dbPromises.push(common.runQuery(  //create record, so that if processing fails, we can query on incomplete/failed processing
+        'POC', 
+        `insert IGNORE into feeds_file (feeds_date, feeds_file) values (?, ?)`, 
+        [processInfo.feedDate, processInfo.name]
+    ));
     readInterface.on('line', async function(line) {
         let tLine = line.trim();
         if (submission.readState == READ_STATES.INIT) { //submission header prior to first <DOCUMENT>
-            if(line.includes('DELET')||line.includes('CORRECTION')) console.log(line, processInfo.path + processInfo.name);
+            if(line.startsWith('<DELETION>') || line.startsWith('<CORRECTION>')) {
+                console.log(line, processInfo.path + processInfo.name);
+            }
             sgmlLines.push(line);
 
 /*             if (tLine == '<COMPANY-DATA>' || tLine == '<OWNER-DATA>') entity = {};
@@ -112,8 +120,8 @@ export async function processFeedFile(processInfo) {
             //console.log('DOC_FOOTER', line);
             sgmlLines.push(line); //captures '</DOCUMENT>' line, but state stays in DOC_FOOTER until either of the following: 
             if (tLine == '<DOCUMENT>') submission.readState = READ_STATES.DOC_HEADER;  //another doc starting
-            if (tLine == '</SUBMISSION>') submission.readState = READ_STATES.READ_COMPLETE; //end of submission!
         }
+        if (submission.readState != READ_STATES.DOC_BODY && tLine == '</SUBMISSION>') submission.readState = READ_STATES.READ_COMPLETE;  //end of submission!
 
         if (submission.readState == READ_STATES.DOC_BODY) {  //ordered above the DOC_HEADER processing section to avoid fall through of <TEXT>
             const d = submission.docs.length - 1;
@@ -170,9 +178,9 @@ export async function processFeedFile(processInfo) {
                 if (tLine == '<TEXT>') {
                     submission.readState = READ_STATES.DOC_BODY;
                 } else {
-                    //console.log('DOC_HEADER', line);
                     sgmlLines.push(line);
                 }
+                if (tLine == '</DOCUMENT>') submission.readState = READ_STATES.DOC_FOOTER;
             }
         }
 

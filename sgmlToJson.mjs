@@ -21,7 +21,10 @@ const SGML_ARRAY_TAGS = [
     'SUBJECT-COMPANY',  //'0001104659-24-038822', 
     'DOCUMENT'
 ];
-
+const SGML_FLAG_TAGS = [ //these do not have data so otherwise they would have value of "" which is falsey.  Tags is these array will be set to true.
+    'correction',
+    'deletion',
+];
 /**
  * Converts SGML tag name to JSON property name (which is also the db field name) 
  * @param {string} tagName - The SGML tag name
@@ -204,7 +207,12 @@ function sgmlToJson(sgml) {
                         const accessionMatch = sgmlBody.match(/<ACCESSION-NUMBER>([^<]*)/);
                         const accessionNumber = accessionMatch ? accessionMatch[1] : 'unknown';
                         if(obj[jsonPropertyName]) throw new Error(`Duplicate tag '${tagName}' found in SGML file. ACCESSION NUMBER: ${accessionNumber}`);
-                        obj[jsonPropertyName] = cleanData || '';
+                        if(SGML_FLAG_TAGS.includes(jsonPropertyName))  {  //flag tags without data are true (e.g. <CORRECTION> and <DELETION>)
+                            obj[jsonPropertyName] = true;
+                        } else {
+                            obj[jsonPropertyName] = cleanData || '';
+                        }
+
                         i++;
                     }
                 }
