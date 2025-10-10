@@ -5,7 +5,7 @@ import { common } from './common.mjs';
 import { sgmlToJson, tagToJson } from './sgmlToJson.mjs';
 import { createReadStream } from 'fs';
 import { createInterface } from 'readline';
-import { writeFile } from 'node:fs/promises';
+import { writeFile, copyFile } from 'node:fs/promises';
 import uuencode from 'uuencode';
 import { promisify } from 'util';  
 import { exec } from 'child_process';
@@ -192,6 +192,13 @@ export async function processFeedFile(processInfo) {
             }
             if(processInfo.writeJsonMetaDataFiles) {
                 fileWritePromises.push(writeFile(docFilingFolder + processInfo.feedDate + '_' + processInfo.name + '.json', JSON.stringify(submissionMetadata, null, 2), 'utf-8'));
+            }
+            
+            // Copy source file to filing folder if it's a correction
+            if(submissionMetadata.submission.correction) {
+                const sourceFile = processInfo.path + processInfo.name;
+                const destFile = docFilingFolder + processInfo.name;
+                fileWritePromises.push(copyFile(sourceFile, destFile));
             }
             
             // Write feeds metadata to database

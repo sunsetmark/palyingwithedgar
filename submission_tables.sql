@@ -378,7 +378,7 @@ CREATE TABLE item_ref (
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (item_code, form)
+    PRIMARY KEY (item_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Insert item descriptions from lookup-data.js
