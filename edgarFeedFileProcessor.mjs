@@ -9,6 +9,7 @@ import { writeFile, copyFile } from 'node:fs/promises';
 import uuencode from 'uuencode';
 import { promisify } from 'util';  
 import { exec } from 'child_process';
+import { fstat } from 'node:fs';
 const execAsync = promisify(exec);
 
 // Constants
@@ -62,8 +63,7 @@ export async function processFeedFile(processInfo) {
     const fileWritePromises = [],
         dbPromises = [],
         sgmlLines = [];
-    let processedByteCount = 0,
-        submission = { //submission has module level scope to be able to report out when killed
+    let submission = { //submission has module level scope to be able to report out when killed
             docs: [],
             readState: READ_STATES.INIT,
             metadata: null
@@ -73,6 +73,7 @@ export async function processFeedFile(processInfo) {
         `insert IGNORE into feeds_file (feeds_date, feeds_file) values (?, ?)`, 
         [processInfo.feedDate, processInfo.name]
     ));
+    
     readInterface.on('line', async function(line) {
         let tLine = line.trim();
         if (submission.readState == READ_STATES.INIT) { //submission header prior to first <DOCUMENT>
@@ -130,7 +131,6 @@ export async function processFeedFile(processInfo) {
             if (tLine == '</TEXT>') {
                 submission.readState = READ_STATES.DOC_FOOTER;
                 doc.state = READ_STATES.READ_COMPLETE;
-                processedByteCount += doc.fileLength;
                 if(processInfo.writeExtractedFiles) {
                     if(doc.fileName) {
                         const docFileName = docFilingFolder + doc.fileName;
@@ -151,7 +151,7 @@ export async function processFeedFile(processInfo) {
                     delete doc.lines; //free up memory
                 }
             } else {
-                doc.fileLength += line.length + 1;  //+1 for the newline character when joined
+                doc.lengthRaw += line.length + 1;  //+1 for the newline character when joined
                 if (processInfo.writeExtractedFiles) { //determined above to have a valid ext and be indexable (and not blank)
                     doc.lines.push(isBinaryFile ? uunencodePadding(line) : line);  
                 }
@@ -161,8 +161,8 @@ export async function processFeedFile(processInfo) {
         if (submission.readState == READ_STATES.DOC_HEADER) {
             if (tLine == '<DOCUMENT>') {  //fall though from decisions in INIT and DOC_FOOTER sections above
                 submission.docs.push({
-                    lengthRaw: 0,
-                    fileLength: 0,
+                    lengthRaw: 0, //length of doc in dissem file between <TEXT> and </TEXT>
+                    fileLength: null, //length of file on disk (after UUDECODE)
                     fileName: null,
                     fileDescription: null,
                     fileType: null,
@@ -174,6 +174,9 @@ export async function processFeedFile(processInfo) {
                 if (tLine.startsWith('<FILENAME>')) {  //can't wait for final SGML parse:  need to know if binary and what file name to save as
                     submission.docs[d].fileName = tLine.substr('<FILENAME>'.length);
                     submission.docs[d].fileExtension = submission.docs[d].fileName.split('.').pop().toLowerCase().trim();
+                }
+                if(tLine.startsWith('<SEQUENCE>')) { 
+                    submission.docs[d].sequence = tLine.substr('<SEQUENCE>'.length);
                 }
                 if (tLine == '<TEXT>') {
                     submission.readState = READ_STATES.DOC_BODY;
@@ -187,6 +190,14 @@ export async function processFeedFile(processInfo) {
         if (submission.readState == READ_STATES.READ_COMPLETE) {
             const submissionMetadata = sgmlToJson(sgmlLines);
             submission.metadata = submissionMetadata.submission;
+            submission.docs.forEach((doc, index) => {
+                if(submissionMetadata.submission     && submissionMetadata.submission.document && submissionMetadata.submission.document[index] 
+                && doc.sequence == submissionMetadata.submission.document[index].sequence 
+                && doc.fileName == submissionMetadata.submission.document[index].filename) { // these two properties are not in the SGML
+                    submissionMetadata.submission.document[index].lengthRaw = doc.lengthRaw;
+                    submissionMetadata.submission.document[index].fileLength = doc.fileLength;
+                }
+            });
             if(processInfo.writeSgmlMetaDataFiles) {
                 fileWritePromises.push(writeFile(docFilingFolder + processInfo.feedDate + '_' + processInfo.name + '.sgml', sgmlLines.join('\n'), 'utf-8'));
             }
@@ -194,20 +205,20 @@ export async function processFeedFile(processInfo) {
                 fileWritePromises.push(writeFile(docFilingFolder + processInfo.feedDate + '_' + processInfo.name + '.json', JSON.stringify(submissionMetadata, null, 2), 'utf-8'));
             }
             
-            // Copy source file to filing folder if it's a correction
+            // Copy source file to filing folder if it's a correction, which also covers deletions
             if(submissionMetadata.submission.correction) {
                 const sourceFile = processInfo.path + processInfo.name;
-                const destFile = docFilingFolder + processInfo.name;
+                const destFile = docFilingFolder + processInfo.feedDate + '_' + processInfo.name;
                 fileWritePromises.push(copyFile(sourceFile, destFile));
             }
             
             // Write feeds metadata to database
             if (submissionMetadata && submissionMetadata.submission) {
                 writeFeedsMetaData(submissionMetadata.submission, processInfo.feedDate, processInfo.name);
+                writeSubmissionHeaderRecords(submissionMetadata.submission, processInfo.feedDate, processInfo.name);  //insert queries run async and promises pushed onto dbPromises array
             }
             
-            writeSubmissionHeaderRecords(submissionMetadata.submission, processInfo.feedDate, processInfo.name);  //insert queries run async and promises pushed onto dbPromises array
-            messageParentFinished('ok');
+             messageParentFinished('ok');
         }
     });
 
@@ -224,7 +235,7 @@ export async function processFeedFile(processInfo) {
             const accessionNumber = jsonMetaData.accession_number || '';
             const filingDate = jsonMetaData.filing_date || '';
             const formType = jsonMetaData.type || '';
-            const filingSize = submission.docs.reduce((total, doc) => total + (doc.fileLength || 0), 0);
+            const filingSize = stream.bytesRead; 
             
             // Extract header information (first 100 characters of SGML)
             //const header1000 = sgmlLines.join('\n').substring(0, 1999);  rather than save to db, use grep file 
@@ -369,23 +380,20 @@ export async function processFeedFile(processInfo) {
                         const feedsFileDocumentQuery = `
                             INSERT INTO feeds_file_document (
                                 feeds_date, feeds_file, sequence, file_name, file_type, 
-                                file_description, file_size, file_ext
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                file_description, file_size, file_size_raw, file_ext
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                             ON DUPLICATE KEY UPDATE
+                                file_name = VALUES(file_name),
                                 file_type = VALUES(file_type),
                                 file_description = VALUES(file_description),
                                 file_size = VALUES(file_size),
+                                file_size_raw = VALUES(file_size_raw),
                                 file_ext = VALUES(file_ext)
                         `;           
                         const fileExt = doc.filename.split('.').pop() || '';
-                        const fileSize = (
-                            submission.docs && submission.docs[index] && submission.docs[index].fileSize 
-                            ? submission.docs[index].fileSize
-                            : null
-                        );
                         dbPromises.push(common.runQuery('POC', feedsFileDocumentQuery, [
                             feedDate, filename, doc.sequence, doc.filename, doc.type || '',
-                            doc.description || '', fileSize, fileExt
+                            doc.description || '', doc.fileLength || null, doc.lengthRaw || null, fileExt
                         ]));
                     }
                 });
@@ -720,6 +728,7 @@ export async function processFeedFile(processInfo) {
 
     async function messageParentFinished(status){
         //console.log(`submission complete; messaging parent`);
+        const dissemFileSize = stream.bytesRead;   
         readInterface.close();
         stream.close();
         //console.log(`indexed form ${result.form} in ${result.processTime}ms`);
@@ -740,7 +749,7 @@ export async function processFeedFile(processInfo) {
             form: submission.metadata.type,
             adsh: submission.metadata.accession_number,
             processedDocumentCount: submission.docs.length,
-            processedByteCount: processedByteCount,
+            processedByteCount: dissemFileSize,
             processNum: processInfo.processNum,
             processTime: (new Date()).getTime()-start,
         };
