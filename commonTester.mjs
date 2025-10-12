@@ -81,7 +81,7 @@ try {
     
     for (const subfolder of subfolders) {
         if (!subfolder.isDirectory()) continue;
-        if (filesProcessed >= 200) break;
+        if (filesProcessed >= 1000) break;
         
         const subfolderPath = join(filingsDir, subfolder.name);
         const files = await readdir(subfolderPath);

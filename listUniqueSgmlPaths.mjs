@@ -88,7 +88,7 @@ function processSgmlFile(filePath) {
         
         // Start with empty tagsFromRoot for each SGML file
         const tagsFromRoot = []; // Stack to track current path
-        const currentPaths = new Set(); // Track paths found in this file
+        const currentPaths = []; // Track paths found in this file with empty string info
         
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i].trim();
@@ -101,6 +101,7 @@ function processSgmlFile(filePath) {
                 const tagMatch = line.match(/^<([A-Z][A-Z0-9-_]*)>(.*)$/);
                 if (tagMatch) {
                     const [, tagName, data] = tagMatch;
+                    // For flag property detection, treat whitespace-only values as empty
                     const cleanData = data.replace(/<\/[^>]*>$/, '').trim();
                     
                     // Check if this is a hierarchical tag by looking for matching closing tag
@@ -149,7 +150,12 @@ function processSgmlFile(filePath) {
                         }
                         pathString += tagName;
                         
-                        currentPaths.add(pathString);
+                        // Track whether this occurrence has an empty value
+                        // cleanData is already trimmed, so whitespace-only values are now empty strings
+                        currentPaths.push({
+                            path: pathString,
+                            isEmpty: cleanData === ''
+                        });
                     }
                 }
             }
@@ -167,24 +173,32 @@ function processSgmlFile(filePath) {
             }
         }
         
-        // Add new paths to global array
-        for (const path of currentPaths) {
+        // Add new paths to global array with empty string tracking
+        for (const pathInfo of currentPaths) {
             // Check if path already exists using some() to compare first item
-            const existingPathIndex = sgmlPaths.findIndex(item => item.path === path);
+            const existingPathIndex = sgmlPaths.findIndex(item => item.path === pathInfo.path);
             
             if (existingPathIndex === -1) {
                 // Path doesn't exist, add new entry
                 sgmlPaths.push({
-                    path: path,
-                    formTypes: [rootForm]
+                    path: pathInfo.path,
+                    formTypes: [rootForm],
+                    totalCount: 1,
+                    emptyCount: pathInfo.isEmpty ? 1 : 0
                 });
             } else {
-                // Path exists, check if form type is already in the array
-                const formTypes = sgmlPaths[existingPathIndex].formTypes;
-                if (!formTypes.includes(rootForm)) {
-                    formTypes.push(rootForm);
+                // Path exists, update counts and form types
+                const existingPath = sgmlPaths[existingPathIndex];
+                existingPath.totalCount++;
+                if (pathInfo.isEmpty) {
+                    existingPath.emptyCount++;
+                }
+                
+                // Check if form type is already in the array
+                if (!existingPath.formTypes.includes(rootForm)) {
+                    existingPath.formTypes.push(rootForm);
                     // Keep form types sorted
-                    formTypes.sort();
+                    existingPath.formTypes.sort();
                 }
             }
         }
@@ -256,15 +270,37 @@ async function main() {
         // Sort paths alphabetically by path name
         sgmlPaths.sort((a, b) => a.path.localeCompare(b.path));
         
+        // Mark paths as flag properties if they're always empty
+        let flagPropertyCount = 0;
+        sgmlPaths.forEach(pathObj => {
+            if (pathObj.totalCount === pathObj.emptyCount && pathObj.totalCount > 0) {
+                pathObj.flagProperty = true;
+                flagPropertyCount++;
+            }
+            // Remove the tracking counts from the final output (keep only flagProperty if true)
+            delete pathObj.totalCount;
+            delete pathObj.emptyCount;
+        });
+        
         // Write results to file
         writeFileSync('sgml_paths.json', JSON.stringify(sgmlPaths, null, 2));
         
         // Log results
         console.log('\n=== RESULTS ===');
         console.log(`Total unique paths found: ${sgmlPaths.length}`);
+        console.log(`Flag properties (always empty): ${flagPropertyCount}`);
         console.log(`Processed SGML files: ${processedSgmlFilesCount}`);
         console.log(`Processed folders: ${processedFoldersCount}`);
         console.log(`Execution time: ${(Date.now() - startTime)/1000}s`);
+        
+        // List flag properties
+        if (flagPropertyCount > 0) {
+            console.log('\n=== FLAG PROPERTIES (Always Empty) ===');
+            sgmlPaths.filter(p => p.flagProperty).forEach((pathObj, index) => {
+                console.log(`${index + 1}. ${pathObj.path}`);
+                console.log(`   Form Types: ${pathObj.formTypes.join(', ')}`);
+            });
+        }
         
         /*
         console.log('\n=== ALL UNIQUE PATHS ===');

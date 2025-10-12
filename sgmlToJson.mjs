@@ -25,7 +25,9 @@ const SGML_FLAG_TAGS = [ //these do not have data so otherwise they would have v
     'correction',
     'deletion',
     'private_to_public',
-];
+    'confirming_copy',
+    'paper',
+];  //note: sgml_paths has SUBMISSION > UNDERWRITER > COMPANY-DATA > ORGANIZATION-NAME being a flag path, but other paths ending in ORGANIZATION-NAME have data.
 /**
  * Converts SGML tag name to JSON property name (which is also the db field name) 
  * @param {string} tagName - The SGML tag name

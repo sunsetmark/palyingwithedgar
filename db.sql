@@ -50,7 +50,7 @@ CREATE TABLE `feeds_file_cik` (
   `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'Primary Key as int reduced index size + keeps order found',
   `feeds_date` char(10) DEFAULT NULL COMMENT 'Feeds Date (yyyymmdd)',
   `feeds_file` varchar(30) DEFAULT NULL COMMENT 'File Name of untarred feeds source file',
-  `cik` int(11) DEFAULT NULL COMMENT 'CIK from header',
+  `cik` BIGINT UNSIGNED DEFAULT NULL COMMENT 'CIK from header',
   `filer_type` VARCHAR(2) COMMENT 'F|R|I|SC|D|S|FF|IE|FB|U  for filer|reporter|issuer|subject_company|DEPOSITOR|SECURITIZER|FILED-FOR|ISSUING_ENTITY|FILED-BY|ISSUER|UNDERWRITER',
   `entity_name` varchar(255) DEFAULT NULL COMMENT 'Entity Name from header',
   PRIMARY KEY (`id`),
@@ -67,8 +67,8 @@ CREATE TABLE `feeds_file_series` (
   `feeds_date` char(10) DEFAULT NULL COMMENT 'Feeds Date ISO 8601 ',
   `feeds_file` varchar(30) DEFAULT NULL COMMENT 'File Name of untarred feeds source file in Feeds',
   `is_new` tinyint(6) DEFAULT 0 NOT NULL COMMENT ' 1= new else existing',
-  `cik` int(11) DEFAULT NULL COMMENT 'CIK from header',
-  `series_id` int(11) DEFAULT NULL COMMENT 'Series ID from header',
+  `cik` BIGINT UNSIGNED DEFAULT NULL COMMENT 'CIK from header',
+  `series_id` int(11) UNSIGNED DEFAULT NULL COMMENT 'Series ID from header',
   `series_name` varchar(255) DEFAULT NULL COMMENT 'Series Name from header',
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_feeds_file_series` (`feeds_date`,`feeds_file`,`cik`,`series_id`),
@@ -84,9 +84,9 @@ CREATE TABLE `feeds_file_class` (
   `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'Primary Key as int reduces index size + keeps order found',
   `feeds_date` char(10) DEFAULT NULL COMMENT 'Feeds Date (yyyymmdd)',
   `feeds_file` varchar(30) DEFAULT NULL COMMENT 'File Name of untarred feeds source file in Feeds',
-  `cik` int(11) DEFAULT NULL COMMENT 'CIK from associated with the series in header',
-  `series_id` int(11) DEFAULT NULL COMMENT 'Series ID from header',
-  `class_id` int(11) DEFAULT NULL COMMENT 'Class ID from header',
+  `cik` BIGINT UNSIGNED DEFAULT NULL COMMENT 'CIK from associated with the series in header',
+  `series_id` int(11)UNSIGNED DEFAULT NULL COMMENT 'Series ID from header',
+  `class_id` int(11) UNSIGNED DEFAULT NULL COMMENT 'Class ID from header',
   `class_name` varchar(255) DEFAULT NULL COMMENT 'Series Name from header',
   PRIMARY KEY (`id`),
   UNIQUE KEY `udx_feeds_file_class` (`feeds_date`,`feeds_file`,`cik`,`series_id`,`class_id`),
@@ -485,6 +485,7 @@ INSERT INTO state_country_ref (edgar_code, iso_country, state_prov_code, country
 -- ----------------------------------------------------------------------------
 -- filer_type_ref: Filer type codes
 -- ----------------------------------------------------------------------------
+DROP TABLE IF EXISTS submission_entity;  --move up due to FK constraint on filer_type_ref
 DROP TABLE IF EXISTS filer_type_ref;
 CREATE TABLE filer_type_ref (
     filer_code CHAR(2) NOT NULL PRIMARY KEY,
@@ -669,7 +670,20 @@ INSERT INTO form_type_ref (form_type, name, description, activated, deprecated) 
 -- ============================================================================
 -- SUBMISSION TABLES
 -- ============================================================================
-
+--DROP dependent tables first due to FK constraints:
+DROP TABLE IF EXISTS submission_entity;
+DROP TABLE IF EXISTS submission_document;
+DROP TABLE IF EXISTS submission_former_name;
+DROP TABLE IF EXISTS submission_document;
+DROP TABLE IF EXISTS submission_class_contract;  --class_constract before series
+DROP TABLE IF EXISTS submission_series;
+DROP TABLE IF EXISTS submission_item;
+DROP TABLE IF EXISTS submission_references_429;
+DROP TABLE IF EXISTS submission_group_members;
+DROP TABLE IF EXISTS submission_merger;
+DROP TABLE IF EXISTS submission_rule_item;  --drop first due to foreign key constraint
+DROP TABLE IF EXISTS submission_rule;
+DROP TABLE IF EXISTS submission_target_data;
 -- ----------------------------------------------------------------------------
 -- submission: Main submission metadata table
 -- ----------------------------------------------------------------------------
@@ -680,13 +694,46 @@ CREATE TABLE submission (
     public TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'Public submission flag',
     public_document_count INT DEFAULT NULL,
     period VARCHAR(8) DEFAULT NULL COMMENT 'Period ending date YYYYMMDD',
+    period_start VARCHAR(8) DEFAULT NULL COMMENT 'Period start date YYYYMMDD',
     filing_date VARCHAR(8) DEFAULT NULL COMMENT 'Filing date YYYYMMDD',
     date_of_filing_date_change VARCHAR(8) DEFAULT NULL COMMENT 'Date of filing date change YYYYMMDD',
     effectiveness_date VARCHAR(8) DEFAULT NULL COMMENT 'Effectiveness date YYYYMMDD',
     acceptance_datetime VARCHAR(14) DEFAULT NULL COMMENT 'Acceptance datetime YYYYMMDDHHmmss',
+    received_date VARCHAR(8) DEFAULT NULL COMMENT 'Received date YYYYMMDD',
+    action_date VARCHAR(8) DEFAULT NULL COMMENT 'Action date YYYYMMDD',
+    public_rel_date VARCHAR(8) DEFAULT NULL COMMENT 'Public release date YYYYMMDD',
     file_number VARCHAR(20) DEFAULT NULL,
     film_number VARCHAR(20) DEFAULT NULL,
     is_paper TINYINT(1) DEFAULT 0,
+    -- Additional metadata fields
+    ma_i_individual VARCHAR(255) DEFAULT NULL COMMENT 'MA-I individual name',
+    previous_accession_number VARCHAR(20) DEFAULT NULL COMMENT 'Previous accession number for amendments',
+    withdrawn_accession_number VARCHAR(20) DEFAULT NULL COMMENT 'Withdrawn accession number',
+    public_reference_acc VARCHAR(20) DEFAULT NULL COMMENT 'Public reference accession',
+    reference_462b VARCHAR(20) DEFAULT NULL COMMENT '462(b) reference',
+    confirming_copy CHAR(1) DEFAULT NULL COMMENT 'Confirming copy flag',
+    private_to_public CHAR(1) DEFAULT NULL COMMENT 'Private to public flag',
+    -- ABS-related fields
+    abs_asset_class VARCHAR(50) DEFAULT NULL COMMENT 'ABS asset class',
+    abs_sub_asset_class VARCHAR(50) DEFAULT NULL COMMENT 'ABS sub asset class',
+    -- Filer status fields
+    is_filer_a_new_registrant CHAR(1) DEFAULT NULL COMMENT 'New registrant flag',
+    is_filer_a_well_known_seasoned_issuer CHAR(1) DEFAULT NULL COMMENT 'Well-known seasoned issuer flag',
+    is_fund_24f2_eligible CHAR(1) DEFAULT NULL COMMENT 'Fund 24F-2 eligible flag',
+    filed_pursuant_to_general_instruction_a2 CHAR(1) DEFAULT NULL COMMENT 'Filed pursuant to General Instruction A.2',
+    registered_entity CHAR(1) DEFAULT NULL COMMENT 'Registered entity flag',
+    -- Activity flags
+    no_annual_activity CHAR(1) DEFAULT NULL COMMENT 'No annual activity flag',
+    no_initial_period_activity CHAR(1) DEFAULT NULL COMMENT 'No initial period activity flag',
+    no_quarterly_activity CHAR(1) DEFAULT NULL COMMENT 'No quarterly activity flag',
+    -- Other fields
+    category VARCHAR(50) DEFAULT NULL COMMENT 'Category',
+    calendar_year_ending VARCHAR(4) DEFAULT NULL COMMENT 'Calendar year ending MMDD',
+    depositor_cik BIGINT UNSIGNED DEFAULT NULL COMMENT 'Depositor CIK',
+    sponsor_cik BIGINT UNSIGNED DEFAULT NULL COMMENT 'Sponsor CIK',
+    resource_ext_issuer VARCHAR(10) DEFAULT NULL COMMENT 'Resource external issuer',
+    timestamp VARCHAR(14) DEFAULT NULL COMMENT 'Timestamp YYYYMMDDHHmmss',
+    -- System fields
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_type (type),
@@ -697,12 +744,11 @@ CREATE TABLE submission (
 -- ----------------------------------------------------------------------------
 -- submission_entity: Denormalized entity data (filer, issuer, reporting_owner, etc.)
 -- ----------------------------------------------------------------------------
-DROP TABLE IF EXISTS submission_entity;
+--moved above the DROP filer_type_ref statement due to FK constraint: DROP TABLE IF EXISTS submission_entity;
 CREATE TABLE submission_entity (
-    pvid BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT 'Private ID for ordering',
     adsh VARCHAR(20) NOT NULL,
     filer_code CHAR(2) NOT NULL COMMENT 'Entity type: F, RO, I, SC, D, S, FF, IE, FB, U',
-    entity_sequence INT NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing',
+    entity_sequence SMALLINT UNSIGNED NOT NULL COMMENT 'Preserves array order from original filing',
     cik VARCHAR(10) NOT NULL,
     conformed_name VARCHAR(255) NOT NULL,
     organization_name VARCHAR(255) DEFAULT NULL,
@@ -730,41 +776,36 @@ CREATE TABLE submission_entity (
     mail_zip VARCHAR(20) DEFAULT NULL,
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (adsh, filer_code, entity_sequence),
     UNIQUE INDEX idx_adsh_cik_filer (adsh, cik, filer_code),
     INDEX idx_cik (cik),
     FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE,
     FOREIGN KEY (filer_code) REFERENCES filer_type_ref(filer_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ----------------------------------------------------------------------------
--- submission_former_company: Former company names
--- ----------------------------------------------------------------------------
-DROP TABLE IF EXISTS submission_former_company;
--- merged into TABLE submission_former_name
 
 -- ----------------------------------------------------------------------------
--- submission_former_name: Former names (for reporting_owner)
+-- submission_former_name: Company Former names
 -- ----------------------------------------------------------------------------
-DROP TABLE IF EXISTS submission_former_name;
 CREATE TABLE submission_former_name (
     adsh VARCHAR(20) NOT NULL,
-    cik VARCHAR(10) NOT NULL,
+    cik BIGINT UNSIGNED NOT NULL,
+    former_name_sequence SMALLINT UNSIGNED NOT NULL COMMENT 'Preserves array order from original filing',
     former_conformed_name VARCHAR(255) NOT NULL,
     date_changed VARCHAR(8) NOT NULL COMMENT 'YYYYMMDD format; multiple changes on same date are possible',
-    former_name_sequence INT NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (adsh, cik, date_changed,former_conformed_name),
+    PRIMARY KEY (adsh, cik, former_name_sequence),
+    UNIQUE KEY (adsh, cik, date_changed, former_conformed_name),
     FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------
 -- submission_document: Documents associated with submission
 -- ----------------------------------------------------------------------------
-DROP TABLE IF EXISTS submission_document;
 CREATE TABLE submission_document (
     adsh VARCHAR(20) NOT NULL,
-    sequence INT NOT NULL,
+    sequence SMALLINT UNSIGNED NOT NULL,
     type VARCHAR(50) DEFAULT NULL,
     filename VARCHAR(255) NOT NULL,
     description TEXT DEFAULT NULL,
@@ -778,11 +819,10 @@ CREATE TABLE submission_document (
 -- ----------------------------------------------------------------------------
 -- submission_series: Series data
 -- ----------------------------------------------------------------------------
-DROP TABLE IF EXISTS submission_series;
 CREATE TABLE submission_series (
     adsh VARCHAR(20) NOT NULL,
-    series_id BIGINT NOT NULL COMMENT 'Series ID as bigint',
-    owner_cik VARCHAR(10) NOT NULL,
+    series_id INT UNSIGNED NOT NULL COMMENT 'Series ID as bigint',
+    owner_cik BIGINT UNSIGNED NOT NULL,
     series_name VARCHAR(255) NOT NULL,
     is_new TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 for new series, 0 for existing',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -796,11 +836,10 @@ CREATE TABLE submission_series (
 -- ----------------------------------------------------------------------------
 -- submission_class_contract: Class/contract data (nested under series)
 -- ----------------------------------------------------------------------------
-DROP TABLE IF EXISTS submission_class_contract;
 CREATE TABLE submission_class_contract (
     adsh VARCHAR(20) NOT NULL,
-    series_id BIGINT NOT NULL,
-    class_contract_id BIGINT NOT NULL COMMENT 'Class contract ID as bigint',
+    series_id INT UNSIGNED NOT NULL,
+    class_contract_id INT UNSIGNED NOT NULL COMMENT 'Class contract ID as bigint',
     class_contract_name VARCHAR(255) NOT NULL,
     class_contract_ticker_symbol VARCHAR(20) DEFAULT NULL,
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -813,14 +852,12 @@ CREATE TABLE submission_class_contract (
 -- ----------------------------------------------------------------------------
 -- submission_item: Items (for 8-K and other forms)
 -- ----------------------------------------------------------------------------
-DROP TABLE IF EXISTS submission_item;
 CREATE TABLE submission_item (
-    pvid BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     adsh VARCHAR(20) NOT NULL,
     item_code VARCHAR(10) NOT NULL,
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_adsh (adsh),
+    PRIMARY KEY (adsh, item_code),
     INDEX idx_item_code (item_code),
     FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -828,59 +865,80 @@ CREATE TABLE submission_item (
 -- ----------------------------------------------------------------------------
 -- submission_references_429: 429 references
 -- ----------------------------------------------------------------------------
-DROP TABLE IF EXISTS submission_references_429;
 CREATE TABLE submission_references_429 (
     adsh VARCHAR(20) NOT NULL,
     reference_429 VARCHAR(255) NOT NULL,
-    reference_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing',
+    reference_sequence SMALLINT UNSIGNED NOT NULL COMMENT 'Preserves array order from original filing',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (adsh, reference_429, reference_sequence),
+    PRIMARY KEY (adsh, reference_sequence),
     FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------
 -- submission_group_members: Group members
 -- ----------------------------------------------------------------------------
-DROP TABLE IF EXISTS submission_group_members;
 CREATE TABLE submission_group_members (
     adsh VARCHAR(20) NOT NULL,
     group_member VARCHAR(255) NOT NULL,
-    group_member_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing',
+    group_member_sequence SMALLINT UNSIGNED NOT NULL COMMENT 'Preserves array order from original filing',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (adsh, group_member, group_member_sequence),
+    PRIMARY KEY (adsh, group_member_sequence),
     FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------
 -- submission_merger: Merger data
 -- ----------------------------------------------------------------------------
-DROP TABLE IF EXISTS submission_merger;
 CREATE TABLE submission_merger (
-    pvid BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     adsh VARCHAR(20) NOT NULL,
-    merger_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing',
+    merger_sequence SMALLINT UNSIGNED NOT NULL COMMENT 'Preserves array order from original filing',
     merger_data TEXT NOT NULL COMMENT 'JSON or text data for merger information',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_adsh (adsh),
+    PRIMARY KEY (adsh, merger_sequence),
     FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------
 -- submission_target_data: Target data
 -- ----------------------------------------------------------------------------
-DROP TABLE IF EXISTS submission_target_data;
+
 CREATE TABLE submission_target_data (
-    pvid BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     adsh VARCHAR(20) NOT NULL,
-    target_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing',
+    target_sequence SMALLINT UNSIGNED NOT NULL COMMENT 'Preserves array order from original filing',
     target_data TEXT NOT NULL COMMENT 'JSON or text data for target information',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_adsh (adsh),
+    PRIMARY KEY (adsh, target_sequence),
     FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------------------------
+-- submission_rule: Rule data (for SD and other forms)
+-- ----------------------------------------------------------------------------
+
+CREATE TABLE submission_rule (
+    adsh VARCHAR(20) NOT NULL PRIMARY KEY,
+    rule_name VARCHAR(50) NOT NULL COMMENT 'Rule name (e.g., 13p-1)',
+    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------------------------
+-- submission_rule_item: Rule items (nested under rule)
+-- ----------------------------------------------------------------------------
+CREATE TABLE submission_rule_item (
+    adsh VARCHAR(20) NOT NULL,
+    item_number VARCHAR(20) NOT NULL COMMENT 'Item number (e.g., 1.01, 1.02)',
+    item_period VARCHAR(8) NOT NULL COMMENT 'Item period YYYYMMDD',
+    item_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing',
+    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (adsh, item_number, item_period, item_sequence),
+    FOREIGN KEY (adsh) REFERENCES submission_rule(adsh) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
@@ -896,6 +954,35 @@ CREATE TABLE submission_target_data (
 
 -- Drop item_sequence column if it exists (items are naturally ordered by item_code)
 -- ALTER TABLE submission_item DROP COLUMN item_sequence;
+
+-- Add new fields to submission table (run manually if upgrading existing database)
+-- ALTER TABLE submission ADD COLUMN period_start VARCHAR(8) DEFAULT NULL COMMENT 'Period start date YYYYMMDD' AFTER period;
+-- ALTER TABLE submission ADD COLUMN received_date VARCHAR(8) DEFAULT NULL COMMENT 'Received date YYYYMMDD' AFTER acceptance_datetime;
+-- ALTER TABLE submission ADD COLUMN action_date VARCHAR(8) DEFAULT NULL COMMENT 'Action date YYYYMMDD' AFTER received_date;
+-- ALTER TABLE submission ADD COLUMN public_rel_date VARCHAR(8) DEFAULT NULL COMMENT 'Public release date YYYYMMDD' AFTER action_date;
+-- ALTER TABLE submission ADD COLUMN ma_i_individual VARCHAR(255) DEFAULT NULL COMMENT 'MA-I individual name' AFTER is_paper;
+-- ALTER TABLE submission ADD COLUMN previous_accession_number VARCHAR(20) DEFAULT NULL COMMENT 'Previous accession number for amendments' AFTER ma_i_individual;
+-- ALTER TABLE submission ADD COLUMN withdrawn_accession_number VARCHAR(20) DEFAULT NULL COMMENT 'Withdrawn accession number' AFTER previous_accession_number;
+-- ALTER TABLE submission ADD COLUMN public_reference_acc VARCHAR(20) DEFAULT NULL COMMENT 'Public reference accession' AFTER withdrawn_accession_number;
+-- ALTER TABLE submission ADD COLUMN reference_462b VARCHAR(20) DEFAULT NULL COMMENT '462(b) reference' AFTER public_reference_acc;
+-- ALTER TABLE submission ADD COLUMN confirming_copy CHAR(1) DEFAULT NULL COMMENT 'Confirming copy flag' AFTER reference_462b;
+-- ALTER TABLE submission ADD COLUMN private_to_public CHAR(1) DEFAULT NULL COMMENT 'Private to public flag' AFTER confirming_copy;
+-- ALTER TABLE submission ADD COLUMN abs_asset_class VARCHAR(50) DEFAULT NULL COMMENT 'ABS asset class' AFTER private_to_public;
+-- ALTER TABLE submission ADD COLUMN abs_sub_asset_class VARCHAR(50) DEFAULT NULL COMMENT 'ABS sub asset class' AFTER abs_asset_class;
+-- ALTER TABLE submission ADD COLUMN is_filer_a_new_registrant CHAR(1) DEFAULT NULL COMMENT 'New registrant flag' AFTER abs_sub_asset_class;
+-- ALTER TABLE submission ADD COLUMN is_filer_a_well_known_seasoned_issuer CHAR(1) DEFAULT NULL COMMENT 'Well-known seasoned issuer flag' AFTER is_filer_a_new_registrant;
+-- ALTER TABLE submission ADD COLUMN is_fund_24f2_eligible CHAR(1) DEFAULT NULL COMMENT 'Fund 24F-2 eligible flag' AFTER is_filer_a_well_known_seasoned_issuer;
+-- ALTER TABLE submission ADD COLUMN filed_pursuant_to_general_instruction_a2 CHAR(1) DEFAULT NULL COMMENT 'Filed pursuant to General Instruction A.2' AFTER is_fund_24f2_eligible;
+-- ALTER TABLE submission ADD COLUMN registered_entity CHAR(1) DEFAULT NULL COMMENT 'Registered entity flag' AFTER filed_pursuant_to_general_instruction_a2;
+-- ALTER TABLE submission ADD COLUMN no_annual_activity CHAR(1) DEFAULT NULL COMMENT 'No annual activity flag' AFTER registered_entity;
+-- ALTER TABLE submission ADD COLUMN no_initial_period_activity CHAR(1) DEFAULT NULL COMMENT 'No initial period activity flag' AFTER no_annual_activity;
+-- ALTER TABLE submission ADD COLUMN no_quarterly_activity CHAR(1) DEFAULT NULL COMMENT 'No quarterly activity flag' AFTER no_initial_period_activity;
+-- ALTER TABLE submission ADD COLUMN category VARCHAR(50) DEFAULT NULL COMMENT 'Category' AFTER no_quarterly_activity;
+-- ALTER TABLE submission ADD COLUMN calendar_year_ending VARCHAR(4) DEFAULT NULL COMMENT 'Calendar year ending MMDD' AFTER category;
+-- ALTER TABLE submission ADD COLUMN depositor_cik VARCHAR(10) DEFAULT NULL COMMENT 'Depositor CIK' AFTER calendar_year_ending;
+-- ALTER TABLE submission ADD COLUMN sponsor_cik VARCHAR(10) DEFAULT NULL COMMENT 'Sponsor CIK' AFTER depositor_cik;
+-- ALTER TABLE submission ADD COLUMN resource_ext_issuer VARCHAR(10) DEFAULT NULL COMMENT 'Resource external issuer' AFTER sponsor_cik;
+-- ALTER TABLE submission ADD COLUMN timestamp VARCHAR(14) DEFAULT NULL COMMENT 'Timestamp YYYYMMDDHHmmss' AFTER resource_ext_issuer;
 
 -- ============================================================================
 -- TRIGGERS FOR MODIFIED TIMESTAMPS

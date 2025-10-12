@@ -423,22 +423,58 @@ export async function processFeedFile(processInfo) {
             // Insert main submission record FIRST (must complete before child records)
             const submissionQuery = `
                 INSERT INTO submission (
-                    adsh, type, public, public_document_count, period, filing_date,
+                    adsh, type, public, public_document_count, period, period_start, filing_date,
                     date_of_filing_date_change, effectiveness_date, acceptance_datetime,
-                    file_number, film_number, is_paper
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    received_date, action_date, public_rel_date,
+                    file_number, film_number, is_paper,
+                    ma_i_individual, previous_accession_number, withdrawn_accession_number,
+                    public_reference_acc, reference_462b, confirming_copy, private_to_public,
+                    abs_asset_class, abs_sub_asset_class,
+                    is_filer_a_new_registrant, is_filer_a_well_known_seasoned_issuer,
+                    is_fund_24f2_eligible, filed_pursuant_to_general_instruction_a2,
+                    registered_entity, no_annual_activity, no_initial_period_activity,
+                    no_quarterly_activity, category, calendar_year_ending,
+                    depositor_cik, sponsor_cik, resource_ext_issuer, timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     type = VALUES(type),
                     public = VALUES(public),
                     public_document_count = VALUES(public_document_count),
                     period = VALUES(period),
+                    period_start = VALUES(period_start),
                     filing_date = VALUES(filing_date),
                     date_of_filing_date_change = VALUES(date_of_filing_date_change),
                     effectiveness_date = VALUES(effectiveness_date),
                     acceptance_datetime = VALUES(acceptance_datetime),
+                    received_date = VALUES(received_date),
+                    action_date = VALUES(action_date),
+                    public_rel_date = VALUES(public_rel_date),
                     file_number = VALUES(file_number),
                     film_number = VALUES(film_number),
-                    is_paper = VALUES(is_paper)
+                    is_paper = VALUES(is_paper),
+                    ma_i_individual = VALUES(ma_i_individual),
+                    previous_accession_number = VALUES(previous_accession_number),
+                    withdrawn_accession_number = VALUES(withdrawn_accession_number),
+                    public_reference_acc = VALUES(public_reference_acc),
+                    reference_462b = VALUES(reference_462b),
+                    confirming_copy = VALUES(confirming_copy),
+                    private_to_public = VALUES(private_to_public),
+                    abs_asset_class = VALUES(abs_asset_class),
+                    abs_sub_asset_class = VALUES(abs_sub_asset_class),
+                    is_filer_a_new_registrant = VALUES(is_filer_a_new_registrant),
+                    is_filer_a_well_known_seasoned_issuer = VALUES(is_filer_a_well_known_seasoned_issuer),
+                    is_fund_24f2_eligible = VALUES(is_fund_24f2_eligible),
+                    filed_pursuant_to_general_instruction_a2 = VALUES(filed_pursuant_to_general_instruction_a2),
+                    registered_entity = VALUES(registered_entity),
+                    no_annual_activity = VALUES(no_annual_activity),
+                    no_initial_period_activity = VALUES(no_initial_period_activity),
+                    no_quarterly_activity = VALUES(no_quarterly_activity),
+                    category = VALUES(category),
+                    calendar_year_ending = VALUES(calendar_year_ending),
+                    depositor_cik = VALUES(depositor_cik),
+                    sponsor_cik = VALUES(sponsor_cik),
+                    resource_ext_issuer = VALUES(resource_ext_issuer),
+                    timestamp = VALUES(timestamp)
             `;
             
             // Execute submission insert first, then chain the dependent inserts
@@ -448,13 +484,40 @@ export async function processFeedFile(processInfo) {
                 1, // public flag - always 1 for public feeds
                 jsonMetaData.public_document_count || null,
                 jsonMetaData.period || null,
+                jsonMetaData.period_start || null,
                 jsonMetaData.filing_date || null,
                 jsonMetaData.date_of_filing_date_change || null,
                 jsonMetaData.effectiveness_date || null,
                 jsonMetaData.acceptance_datetime || null,
+                jsonMetaData.received_date || null,
+                jsonMetaData.action_date || null,
+                jsonMetaData.public_rel_date || null,
                 jsonMetaData.file_number || null,
                 jsonMetaData.film_number || null,
-                jsonMetaData.is_paper ? 1 : 0
+                jsonMetaData.is_paper ? 1 : 0,
+                jsonMetaData.ma_i_individual || null,
+                jsonMetaData.previous_accession_number || null,
+                jsonMetaData.withdrawn_accession_number || null,
+                jsonMetaData.public_reference_acc || null,
+                jsonMetaData.reference_462b || null,
+                jsonMetaData.confirming_copy || null,
+                jsonMetaData.private_to_public || null,
+                jsonMetaData.abs_asset_class || null,
+                jsonMetaData.abs_sub_asset_class || null,
+                jsonMetaData.is_filer_a_new_registrant || null,
+                jsonMetaData.is_filer_a_well_known_seasoned_issuer || null,
+                jsonMetaData.is_fund_24f2_eligible || null,
+                jsonMetaData.filed_pursuant_to_general_instruction_a2 || null,
+                jsonMetaData.registered_entity || null,
+                jsonMetaData.no_annual_activity || null,
+                jsonMetaData.no_initial_period_activity || null,
+                jsonMetaData.no_quarterly_activity || null,
+                jsonMetaData.category || null,
+                jsonMetaData.calendar_year_ending || null,
+                jsonMetaData.depositor_cik || null,
+                jsonMetaData.sponsor_cik || null,
+                jsonMetaData.resource_ext_issuer || null,
+                jsonMetaData.timestamp || null
             ]).then(() => {
                 // After submission is inserted, insert all dependent records
                 insertDependentRecords(jsonMetaData, feedDate, filename, adsh);
@@ -780,6 +843,38 @@ export async function processFeedFile(processInfo) {
                         dbPromises.push(common.runQuery('POC', targetQuery, [adsh, index, targetJson]));
                     }
                 });
+            }
+
+            // Process rule data (for SD and other forms)
+            if (jsonMetaData.rule && jsonMetaData.rule.rule_name) {
+                const ruleQuery = `
+                    INSERT INTO submission_rule (adsh, rule_name)
+                    VALUES (?, ?)
+                    ON DUPLICATE KEY UPDATE rule_name = VALUES(rule_name)
+                `;
+                const rulePromise = common.runQuery('POC', ruleQuery, [
+                    adsh, jsonMetaData.rule.rule_name
+                ]).then(() => {
+                    // After rule is inserted, insert rule items
+                    if (jsonMetaData.rule.item && Array.isArray(jsonMetaData.rule.item)) {
+                        jsonMetaData.rule.item.forEach((ruleItem, index) => {
+                            if (ruleItem && ruleItem.item_number && ruleItem.item_period) {
+                                const ruleItemQuery = `
+                                    INSERT INTO submission_rule_item (adsh, item_number, item_period, item_sequence)
+                                    VALUES (?, ?, ?, ?)
+                                    ON DUPLICATE KEY UPDATE 
+                                        item_number = VALUES(item_number),
+                                        item_period = VALUES(item_period),
+                                        item_sequence = VALUES(item_sequence)
+                                `;
+                                dbPromises.push(common.runQuery('POC', ruleItemQuery, [
+                                    adsh, ruleItem.item_number, ruleItem.item_period, index
+                                ]));
+                            }
+                        });
+                    }
+                });
+                dbPromises.push(rulePromise);
             }
 
         } catch (error) {

@@ -364,6 +364,7 @@ export const fetchSubmissionMetadata = async function(adsh) {
             submission.public_document_count = submissionRow.public_document_count.toString();
         }
         if (submissionRow.period) submission.period = submissionRow.period;
+        if (submissionRow.period_start) submission.period_start = submissionRow.period_start;
         if (submissionRow.filing_date) submission.filing_date = submissionRow.filing_date;
         if (submissionRow.date_of_filing_date_change) {
             submission.date_of_filing_date_change = submissionRow.date_of_filing_date_change;
@@ -374,13 +375,75 @@ export const fetchSubmissionMetadata = async function(adsh) {
         if (submissionRow.acceptance_datetime) {
             submission.acceptance_datetime = submissionRow.acceptance_datetime;
         }
+        if (submissionRow.received_date) submission.received_date = submissionRow.received_date;
+        if (submissionRow.action_date) submission.action_date = submissionRow.action_date;
+        if (submissionRow.public_rel_date) submission.public_rel_date = submissionRow.public_rel_date;
         if (submissionRow.file_number) submission.file_number = submissionRow.file_number;
         if (submissionRow.film_number) submission.film_number = submissionRow.film_number;
         if (submissionRow.is_paper) submission.is_paper = submissionRow.is_paper;
         
+        // Additional metadata fields
+        if (submissionRow.ma_i_individual) submission.ma_i_individual = submissionRow.ma_i_individual;
+        if (submissionRow.previous_accession_number) {
+            submission.previous_accession_number = submissionRow.previous_accession_number;
+        }
+        if (submissionRow.withdrawn_accession_number) {
+            submission.withdrawn_accession_number = submissionRow.withdrawn_accession_number;
+        }
+        if (submissionRow.public_reference_acc) {
+            submission.public_reference_acc = submissionRow.public_reference_acc;
+        }
+        if (submissionRow.reference_462b) submission.reference_462b = submissionRow.reference_462b;
+        if (submissionRow.confirming_copy) submission.confirming_copy = submissionRow.confirming_copy;
+        if (submissionRow.private_to_public) submission.private_to_public = submissionRow.private_to_public;
+        
+        // ABS fields
+        if (submissionRow.abs_asset_class) submission.abs_asset_class = submissionRow.abs_asset_class;
+        if (submissionRow.abs_sub_asset_class) {
+            submission.abs_sub_asset_class = submissionRow.abs_sub_asset_class;
+        }
+        
+        // Filer status fields
+        if (submissionRow.is_filer_a_new_registrant) {
+            submission.is_filer_a_new_registrant = submissionRow.is_filer_a_new_registrant;
+        }
+        if (submissionRow.is_filer_a_well_known_seasoned_issuer) {
+            submission.is_filer_a_well_known_seasoned_issuer = submissionRow.is_filer_a_well_known_seasoned_issuer;
+        }
+        if (submissionRow.is_fund_24f2_eligible) {
+            submission.is_fund_24f2_eligible = submissionRow.is_fund_24f2_eligible;
+        }
+        if (submissionRow.filed_pursuant_to_general_instruction_a2) {
+            submission.filed_pursuant_to_general_instruction_a2 = submissionRow.filed_pursuant_to_general_instruction_a2;
+        }
+        if (submissionRow.registered_entity) submission.registered_entity = submissionRow.registered_entity;
+        
+        // Activity flags
+        if (submissionRow.no_annual_activity) {
+            submission.no_annual_activity = submissionRow.no_annual_activity;
+        }
+        if (submissionRow.no_initial_period_activity) {
+            submission.no_initial_period_activity = submissionRow.no_initial_period_activity;
+        }
+        if (submissionRow.no_quarterly_activity) {
+            submission.no_quarterly_activity = submissionRow.no_quarterly_activity;
+        }
+        
+        // Other fields
+        if (submissionRow.category) submission.category = submissionRow.category;
+        if (submissionRow.calendar_year_ending) {
+            submission.calendar_year_ending = submissionRow.calendar_year_ending;
+        }
+        if (submissionRow.depositor_cik) submission.depositor_cik = submissionRow.depositor_cik;
+        if (submissionRow.sponsor_cik) submission.sponsor_cik = submissionRow.sponsor_cik;
+        if (submissionRow.resource_ext_issuer) {
+            submission.resource_ext_issuer = submissionRow.resource_ext_issuer;
+        }
+        if (submissionRow.timestamp) submission.timestamp = submissionRow.timestamp;
+        
         // Query entities
         const entityRows = await runQuery('POC',
-            'SELECT * FROM submission_entity WHERE adsh = ? ORDER BY filer_code, entity_sequence, pvid', [adsh]);
+            'SELECT * FROM submission_entity WHERE adsh = ? ORDER BY filer_code, entity_sequence', [adsh]);
         
         // Map filer codes back to entity type names
         const filerCodeMap = {
@@ -402,8 +465,11 @@ export const fetchSubmissionMetadata = async function(adsh) {
             const entityType = filerCodeMap[entityRow.filer_code];
             if (!entityType) continue;
             
-            // Determine if this is owner_data or company_data based on entity type
-            const isOwnerType = ['reporting_owner'].includes(entityType);
+            // Determine if this is owner_data or company_data based on entity type and form type
+            // For form 144, reporting_owner uses company_data; for forms 3, 4, 5 it uses owner_data
+            // Check root form type (strip /A amendment suffix)
+            const rootFormType = submissionRow.type.replace(/\/A$/, '');
+            const isOwnerType = entityType === 'reporting_owner' && ['3', '4', '5'].includes(rootFormType);
             const dataKey = isOwnerType ? 'owner_data' : 'company_data';
             
             const entity = {};
@@ -463,7 +529,7 @@ export const fetchSubmissionMetadata = async function(adsh) {
             
             // Query former names for this entity
             const formerNameRows = await runQuery('POC',
-                'SELECT * FROM submission_former_name WHERE adsh = ? AND cik = ? ORDER BY former_name_sequence, date_changed, former_conformed_name',
+                'SELECT * FROM submission_former_name WHERE adsh = ? AND cik = ? ORDER BY former_name_sequence desc',
                 [adsh, entityRow.cik]);
             
             if (formerNameRows && formerNameRows.length > 0) {
@@ -611,6 +677,30 @@ export const fetchSubmissionMetadata = async function(adsh) {
         if (targetRows && targetRows.length > 0) {
             // Parse JSON strings back into objects
             submission.target_data = targetRows.map(row => JSON.parse(row.target_data));
+        }
+        
+        // Query rule data
+        const ruleRows = await runQuery('POC',
+            'SELECT * FROM submission_rule WHERE adsh = ?', 
+            [adsh]);
+        
+        if (ruleRows && ruleRows.length > 0) {
+            const ruleRow = ruleRows[0];
+            submission.rule = {
+                rule_name: ruleRow.rule_name
+            };
+            
+            // Query rule items
+            const ruleItemRows = await runQuery('POC',
+                'SELECT item_number, item_period FROM submission_rule_item WHERE adsh = ? ORDER BY item_sequence', 
+                [adsh]);
+            
+            if (ruleItemRows && ruleItemRows.length > 0) {
+                submission.rule.item = ruleItemRows.map(row => ({
+                    item_number: row.item_number,
+                    item_period: row.item_period
+                }));
+            }
         }
         
         return { submission };
