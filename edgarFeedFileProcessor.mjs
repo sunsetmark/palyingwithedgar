@@ -325,7 +325,8 @@ export async function processFeedFile(processInfo) {
                                 feeds_date, feeds_file, cik, is_new, series_id, series_name
                             ) VALUES (?, ?, ?, ?, ?, ?)
                             ON DUPLICATE KEY UPDATE
-                                series_name = VALUES(series_name)`;
+                                series_name = VALUES(series_name),
+                                is_new = VALUES(is_new)`;
                         dbPromises.push(common.runQuery(
                             'POC', 
                             feedsFileSeriesQuery, 
@@ -428,6 +429,7 @@ export async function processFeedFile(processInfo) {
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     type = VALUES(type),
+                    public = VALUES(public),
                     public_document_count = VALUES(public_document_count),
                     period = VALUES(period),
                     filing_date = VALUES(filing_date),
@@ -493,7 +495,7 @@ export async function processFeedFile(processInfo) {
                 if (!entities) return;
                 const entityArray = Array.isArray(entities) ? entities : [entities];
                 
-                entityArray.forEach(entity => {
+                entityArray.forEach((entity, index) => {
                     const entityData = entity.company_data || entity.owner_data;
                     if (!entityData || !entityData.cik) return;
 
@@ -503,14 +505,15 @@ export async function processFeedFile(processInfo) {
 
                     const entityQuery = `
                         INSERT INTO submission_entity (
-                            adsh, filer_code, cik, conformed_name, organization_name,
+                            adsh, filer_code, entity_sequence, cik, conformed_name, organization_name,
                             irs_number, state_of_incorporation, fiscal_year_end, assigned_sic,
                             filing_form_type, filing_act, filing_file_number, filing_film_number,
                             business_street1, business_street2, business_city, business_state,
                             business_zip, business_phone,
                             mail_street1, mail_street2, mail_city, mail_state, mail_zip
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ON DUPLICATE KEY UPDATE
+                            entity_sequence = VALUES(entity_sequence),
                             conformed_name = VALUES(conformed_name),
                             organization_name = VALUES(organization_name),
                             irs_number = VALUES(irs_number),
@@ -535,7 +538,7 @@ export async function processFeedFile(processInfo) {
                     `;
 
                     dbPromises.push(common.runQuery('POC', entityQuery, [
-                        adsh, filerCode, entityData.cik, entityData.conformed_name || '',
+                        adsh, filerCode, index, entityData.cik, entityData.conformed_name || '',
                         entityData.organization_name || null,
                         entityData.irs_number || null,
                         entityData.state_of_incorporation || null,
@@ -559,36 +562,27 @@ export async function processFeedFile(processInfo) {
                     ]));
 
                     // Process former_company array
-                    if (entity.former_company && Array.isArray(entity.former_company)) {
-                        entity.former_company.forEach(former => {
-                            if (former.former_conformed_name && former.date_changed) {
-                                const formerCompanyQuery = `
-                                    INSERT INTO submission_former_company (adsh, cik, former_conformed_name, date_changed)
-                                    VALUES (?, ?, ?, ?)
-                                    ON DUPLICATE KEY UPDATE former_conformed_name = VALUES(former_conformed_name)
-                                `;
-                                dbPromises.push(common.runQuery('POC', formerCompanyQuery, [
-                                    adsh, entityData.cik, former.former_conformed_name, former.date_changed
-                                ]));
-                            }
-                        });
+                    function processFormerCompany(formerNamesArray) {
+                        if (formerNamesArray && Array.isArray(formerNamesArray)) {
+                            formerNamesArray.forEach((former, formerIndex) => {
+                                if (former.former_conformed_name && former.date_changed) {
+                                    const formerCompanyQuery = `
+                                        INSERT INTO submission_former_name (adsh, cik, former_conformed_name, date_changed, former_name_sequence)
+                                        VALUES (?, ?, ?, ?, ?)
+                                        ON DUPLICATE KEY UPDATE 
+                                        former_conformed_name = VALUES(former_conformed_name),
+                                        date_changed = VALUES(date_changed),
+                                        former_name_sequence = VALUES(former_name_sequence)
+                                    `;
+                                    dbPromises.push(common.runQuery('POC', formerCompanyQuery, [
+                                        adsh, entityData.cik, former.former_conformed_name, former.date_changed, formerIndex
+                                    ]));
+                                }
+                            });
+                        }
                     }
-
-                    // Process former_name array (for reporting_owner)
-                    if (entity.former_name && Array.isArray(entity.former_name)) {
-                        entity.former_name.forEach(former => {
-                            if (former.former_conformed_name && former.date_changed) {
-                                const formerNameQuery = `
-                                    INSERT INTO submission_former_name (adsh, cik, former_conformed_name, date_changed)
-                                    VALUES (?, ?, ?, ?)
-                                    ON DUPLICATE KEY UPDATE former_conformed_name = VALUES(former_conformed_name)
-                                `;
-                                dbPromises.push(common.runQuery('POC', formerNameQuery, [
-                                    adsh, entityData.cik, former.former_conformed_name, former.date_changed
-                                ]));
-                            }
-                        });
-                    }
+                    processFormerCompany(entity.former_company);
+                    processFormerCompany(entity.former_name);  //form 3, 4, 5 for reporting_owner only
                 });
             };
 
@@ -716,6 +710,74 @@ export async function processFeedFile(processInfo) {
                             ON DUPLICATE KEY UPDATE item_code = VALUES(item_code)
                         `;
                         dbPromises.push(common.runQuery('POC', itemQuery, [adsh, item]));
+                    }
+                });
+            }
+
+            // Process references_429
+            if (jsonMetaData.references_429 && Array.isArray(jsonMetaData.references_429)) {
+                jsonMetaData.references_429.forEach((reference, index) => {
+                    if (reference) {
+                        const referenceQuery = `
+                            INSERT INTO submission_references_429 (adsh, reference_429, reference_sequence)
+                            VALUES (?, ?, ?)
+                            ON DUPLICATE KEY UPDATE 
+                                reference_429 = VALUES(reference_429),
+                                reference_sequence = VALUES(reference_sequence)
+                        `;
+                        dbPromises.push(common.runQuery('POC', referenceQuery, [adsh, reference, index]));
+                    }
+                });
+            }
+
+            // Process group_members
+            if (jsonMetaData.group_members && Array.isArray(jsonMetaData.group_members)) {
+                jsonMetaData.group_members.forEach((member, index) => {
+                    if (member) {
+                        const memberQuery = `
+                            INSERT INTO submission_group_members (adsh, group_member, group_member_sequence)
+                            VALUES (?, ?, ?)
+                            ON DUPLICATE KEY UPDATE 
+                                group_member = VALUES(group_member),
+                                group_member_sequence = VALUES(group_member_sequence)
+                        `;
+                        dbPromises.push(common.runQuery('POC', memberQuery, [adsh, member, index]));
+                    }
+                });
+            }
+
+            // Process merger data
+            if (jsonMetaData.merger && Array.isArray(jsonMetaData.merger)) {
+                jsonMetaData.merger.forEach((mergerData, index) => {
+                    if (mergerData) {
+                        const mergerQuery = `
+                            INSERT INTO submission_merger (adsh, merger_sequence, merger_data)
+                            VALUES (?, ?, ?)
+                            ON DUPLICATE KEY UPDATE 
+                                merger_sequence = VALUES(merger_sequence),
+                                merger_data = VALUES(merger_data)
+                        `;
+                        // Store complex merger data as JSON string
+                        const mergerJson = JSON.stringify(mergerData);
+                        dbPromises.push(common.runQuery('POC', mergerQuery, [adsh, index, mergerJson]));
+                    }
+                });
+            }
+
+            // Process target_data
+            if (jsonMetaData.target_data && Array.isArray(jsonMetaData.target_data)) {
+                jsonMetaData.target_data.forEach((targetData, index) => {
+                    if (targetData) {
+                        const targetQuery = `
+                            INSERT INTO submission_target_data (adsh, target_sequence, target_data)
+                            VALUES (?, ?, ?)
+                            ON DUPLICATE KEY UPDATE 
+                                target_sequence = VALUES(target_sequence),
+                                target_data = VALUES(target_data)
+                        `;
+                        // Store complex target data as JSON string
+                        const targetJson = JSON.stringify(targetData);
+                        dbPromises.push(common.runQuery('POC', targetQuery, [adsh, index, targetJson]));
                     }
                 });
             }

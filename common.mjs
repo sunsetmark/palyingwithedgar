@@ -336,6 +336,290 @@ export const extractIntId = function(adshCikSeriesClassId) {
     throw new Error(`Input '${adshCikSeriesClassId}' does not match any of the 4 valid formats: CIK (10 digits), Series ID (S + 9 digits), Class ID (C + 9 digits), or Accession Number (10-2-6 with dashes)`);
 };
 
+/**
+ * Fetches submission metadata from database and returns JSON matching the original metadata structure
+ * @param {string} adsh - The accession number (e.g., "0000754811-24-000001")
+ * @returns {Object} - JSON object matching the structure written by writeSubmissionHeaderRecords
+ */
+export const fetchSubmissionMetadata = async function(adsh) {
+    try {
+        // Query main submission record
+        const submissionRows = await runQuery('POC', 
+            'SELECT * FROM submission WHERE adsh = ?', [adsh]);
+        
+        if (!submissionRows || submissionRows.length === 0) {
+            throw new Error(`No submission found for adsh: ${adsh}`);
+        }
+        
+        const submissionRow = submissionRows[0];
+        
+        // Build base submission object
+        const submission = {
+            accession_number: submissionRow.adsh,
+            type: submissionRow.type
+        };
+        
+        // Add optional fields if they exist
+        if (submissionRow.public_document_count !== null) {
+            submission.public_document_count = submissionRow.public_document_count.toString();
+        }
+        if (submissionRow.period) submission.period = submissionRow.period;
+        if (submissionRow.filing_date) submission.filing_date = submissionRow.filing_date;
+        if (submissionRow.date_of_filing_date_change) {
+            submission.date_of_filing_date_change = submissionRow.date_of_filing_date_change;
+        }
+        if (submissionRow.effectiveness_date) {
+            submission.effectiveness_date = submissionRow.effectiveness_date;
+        }
+        if (submissionRow.acceptance_datetime) {
+            submission.acceptance_datetime = submissionRow.acceptance_datetime;
+        }
+        if (submissionRow.file_number) submission.file_number = submissionRow.file_number;
+        if (submissionRow.film_number) submission.film_number = submissionRow.film_number;
+        if (submissionRow.is_paper) submission.is_paper = submissionRow.is_paper;
+        
+        // Query entities
+        const entityRows = await runQuery('POC',
+            'SELECT * FROM submission_entity WHERE adsh = ? ORDER BY filer_code, entity_sequence, pvid', [adsh]);
+        
+        // Map filer codes back to entity type names
+        const filerCodeMap = {
+            'F': 'filer',
+            'RO': 'reporting_owner',
+            'I': 'issuer',
+            'SC': 'subject_company',
+            'D': 'depositor',
+            'S': 'securitizer',
+            'FF': 'filed_for',
+            'IE': 'issuing_entity',
+            'FB': 'filed_by',
+            'U': 'underwriter'
+        };
+        
+        // Group entities by type
+        const entitiesByType = {};
+        for (const entityRow of entityRows) {
+            const entityType = filerCodeMap[entityRow.filer_code];
+            if (!entityType) continue;
+            
+            // Determine if this is owner_data or company_data based on entity type
+            const isOwnerType = ['reporting_owner'].includes(entityType);
+            const dataKey = isOwnerType ? 'owner_data' : 'company_data';
+            
+            const entity = {};
+            
+            // Build entity data
+            const entityData = {
+                conformed_name: entityRow.conformed_name,
+                cik: entityRow.cik
+            };
+            
+            if (entityRow.assigned_sic) entityData.assigned_sic = entityRow.assigned_sic;
+            // Always include organization_name even if empty (matches writeSubmissionHeaderRecords behavior)
+            if (entityRow.organization_name !== null) {
+                entityData.organization_name = entityRow.organization_name;
+            }
+            if (entityRow.irs_number) entityData.irs_number = entityRow.irs_number;
+            if (entityRow.state_of_incorporation) {
+                entityData.state_of_incorporation = entityRow.state_of_incorporation;
+            }
+            if (entityRow.fiscal_year_end) entityData.fiscal_year_end = entityRow.fiscal_year_end;
+            
+            entity[dataKey] = entityData;
+            
+            // Add filing values if present
+            if (entityRow.filing_form_type || entityRow.filing_act || 
+                entityRow.filing_file_number || entityRow.filing_film_number) {
+                const filingValues = {};
+                if (entityRow.filing_form_type) filingValues.form_type = entityRow.filing_form_type;
+                if (entityRow.filing_act) filingValues.act = entityRow.filing_act;
+                if (entityRow.filing_file_number) filingValues.file_number = entityRow.filing_file_number;
+                if (entityRow.filing_film_number) filingValues.film_number = entityRow.filing_film_number;
+                entity.filing_values = filingValues;
+            }
+            
+            // Add business address if present (check for any business address field)
+            if (entityRow.business_street1 || entityRow.business_city || entityRow.business_phone) {
+                const businessAddress = {};
+                if (entityRow.business_street1) businessAddress.street1 = entityRow.business_street1;
+                if (entityRow.business_street2) businessAddress.street2 = entityRow.business_street2;
+                if (entityRow.business_city) businessAddress.city = entityRow.business_city;
+                if (entityRow.business_state) businessAddress.state = entityRow.business_state;
+                if (entityRow.business_zip) businessAddress.zip = entityRow.business_zip;
+                if (entityRow.business_phone) businessAddress.phone = entityRow.business_phone;
+                entity.business_address = businessAddress;
+            }
+            
+            // Add mail address if present (check for any mail address field)
+            if (entityRow.mail_street1 || entityRow.mail_city) {
+                const mailAddress = {};
+                if (entityRow.mail_street1) mailAddress.street1 = entityRow.mail_street1;
+                if (entityRow.mail_street2) mailAddress.street2 = entityRow.mail_street2;
+                if (entityRow.mail_city) mailAddress.city = entityRow.mail_city;
+                if (entityRow.mail_state) mailAddress.state = entityRow.mail_state;
+                if (entityRow.mail_zip) mailAddress.zip = entityRow.mail_zip;
+                entity.mail_address = mailAddress;
+            }
+            
+            // Query former names for this entity
+            const formerNameRows = await runQuery('POC',
+                'SELECT * FROM submission_former_name WHERE adsh = ? AND cik = ? ORDER BY former_name_sequence, date_changed, former_conformed_name',
+                [adsh, entityRow.cik]);
+            
+            if (formerNameRows && formerNameRows.length > 0) {
+                const formerKey = isOwnerType ? 'former_name' : 'former_company';
+                entity[formerKey] = formerNameRows.map(fn => ({
+                    former_conformed_name: fn.former_conformed_name,
+                    date_changed: fn.date_changed
+                }));
+            }
+            
+            // Add to entities by type
+            if (!entitiesByType[entityType]) {
+                entitiesByType[entityType] = [];
+            }
+            entitiesByType[entityType].push(entity);
+        }
+        
+        // Add entities to submission (as array or single object based on type)
+        for (const [entityType, entities] of Object.entries(entitiesByType)) {
+            // reporting_owner and filer are typically arrays, others can be single objects
+            if (['reporting_owner', 'filer'].includes(entityType) || entities.length > 1) {
+                submission[entityType] = entities;
+            } else {
+                submission[entityType] = entities[0];
+            }
+        }
+        
+        // Query documents
+        const documentRows = await runQuery('POC',
+            'SELECT * FROM submission_document WHERE adsh = ? ORDER BY sequence', [adsh]);
+        
+        if (documentRows && documentRows.length > 0) {
+            submission.document = documentRows.map(doc => {
+                const docObj = {
+                    type: doc.type,
+                    sequence: doc.sequence.toString(),
+                    filename: doc.filename
+                };
+                if (doc.description) docObj.description = doc.description;
+                return docObj;
+            });
+        }
+        
+        // Query series and classes
+        const seriesRows = await runQuery('POC',
+            'SELECT * FROM submission_series WHERE adsh = ? ORDER BY owner_cik, series_id', [adsh]);
+        
+        if (seriesRows && seriesRows.length > 0) {
+            const newSeries = [];
+            const existingSeries = [];
+            
+            for (const seriesRow of seriesRows) {
+                const series = {
+                    series_id: formatSeriesId(seriesRow.series_id),
+                    series_name: seriesRow.series_name
+                };
+                
+                if (seriesRow.owner_cik) {
+                    series.owner_cik = seriesRow.owner_cik;
+                }
+                
+                // Query class contracts for this series
+                const classRows = await runQuery('POC',
+                    'SELECT * FROM submission_class_contract WHERE adsh = ? AND series_id = ? order by class_contract_id',
+                    [adsh, seriesRow.series_id]);
+                
+                if (classRows && classRows.length > 0) {
+                    series.class_contract = classRows.map(cc => {
+                        const classObj = {
+                            class_contract_id: formatClassId(cc.class_contract_id),
+                            class_contract_name: cc.class_contract_name
+                        };
+                        if (cc.class_contract_ticker_symbol) {
+                            classObj.class_contract_ticker_symbol = cc.class_contract_ticker_symbol;
+                        }
+                        return classObj;
+                    });
+                }
+                
+                if (seriesRow.is_new) {
+                    newSeries.push(series);
+                } else {
+                    existingSeries.push(series);
+                }
+            }
+            
+            if (newSeries.length > 0 || existingSeries.length > 0) {
+                submission.series_and_classes_contracts_data = {};
+                
+                if (existingSeries.length > 0) {
+                    submission.series_and_classes_contracts_data.existing_series_and_classes_contracts = {
+                        series: existingSeries
+                    };
+                }
+                
+                if (newSeries.length > 0) {
+                    submission.series_and_classes_contracts_data.new_series_and_classes_contracts = {
+                        new_series: newSeries
+                    };
+                }
+            }
+        }
+        
+        // Query items (naturally ordered by item_code)
+        const itemRows = await runQuery('POC',
+            'SELECT item_code FROM submission_item WHERE adsh = ? ORDER BY item_code', [adsh]);
+        
+        if (itemRows && itemRows.length > 0) {
+            submission.item = itemRows.map(row => row.item_code);
+        }
+        
+        // Query references_429
+        const referencesRows = await runQuery('POC',
+            'SELECT reference_429 FROM submission_references_429 WHERE adsh = ? ORDER BY reference_sequence', 
+            [adsh]);
+        
+        if (referencesRows && referencesRows.length > 0) {
+            submission.references_429 = referencesRows.map(row => row.reference_429);
+        }
+        
+        // Query group_members
+        const groupMembersRows = await runQuery('POC',
+            'SELECT group_member FROM submission_group_members WHERE adsh = ? ORDER BY group_member_sequence', 
+            [adsh]);
+        
+        if (groupMembersRows && groupMembersRows.length > 0) {
+            submission.group_members = groupMembersRows.map(row => row.group_member);
+        }
+        
+        // Query merger data
+        const mergerRows = await runQuery('POC',
+            'SELECT merger_data FROM submission_merger WHERE adsh = ? ORDER BY merger_sequence', 
+            [adsh]);
+        
+        if (mergerRows && mergerRows.length > 0) {
+            // Parse JSON strings back into objects
+            submission.merger = mergerRows.map(row => JSON.parse(row.merger_data));
+        }
+        
+        // Query target_data
+        const targetRows = await runQuery('POC',
+            'SELECT target_data FROM submission_target_data WHERE adsh = ? ORDER BY target_sequence', 
+            [adsh]);
+        
+        if (targetRows && targetRows.length > 0) {
+            // Parse JSON strings back into objects
+            submission.target_data = targetRows.map(row => JSON.parse(row.target_data));
+        }
+        
+        return { submission };
+        
+    } catch (error) {
+        throw new Error(`fetchSubmissionMetadata Error: ${error.message}`);
+    }
+};
+
 // Export common object with all functions
 export const common = {
     s3ReadString,
@@ -352,5 +636,6 @@ export const common = {
     formatClassId,
     formatIndexKey,
     formatAccessionNumber,
-    extractIntId
+    extractIntId,
+    fetchSubmissionMetadata
 };

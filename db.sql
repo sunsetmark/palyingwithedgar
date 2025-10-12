@@ -702,6 +702,7 @@ CREATE TABLE submission_entity (
     pvid BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT 'Private ID for ordering',
     adsh VARCHAR(20) NOT NULL,
     filer_code CHAR(2) NOT NULL COMMENT 'Entity type: F, RO, I, SC, D, S, FF, IE, FB, U',
+    entity_sequence INT NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing',
     cik VARCHAR(10) NOT NULL,
     conformed_name VARCHAR(255) NOT NULL,
     organization_name VARCHAR(255) DEFAULT NULL,
@@ -750,6 +751,7 @@ CREATE TABLE submission_former_name (
     cik VARCHAR(10) NOT NULL,
     former_conformed_name VARCHAR(255) NOT NULL,
     date_changed VARCHAR(8) NOT NULL COMMENT 'YYYYMMDD format; multiple changes on same date are possible',
+    former_name_sequence INT NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (adsh, cik, date_changed,former_conformed_name),
@@ -830,9 +832,10 @@ DROP TABLE IF EXISTS submission_references_429;
 CREATE TABLE submission_references_429 (
     adsh VARCHAR(20) NOT NULL,
     reference_429 VARCHAR(255) NOT NULL,
+    reference_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (adsh,reference_429),
+    PRIMARY KEY (adsh, reference_429, reference_sequence),
     FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -843,9 +846,10 @@ DROP TABLE IF EXISTS submission_group_members;
 CREATE TABLE submission_group_members (
     adsh VARCHAR(20) NOT NULL,
     group_member VARCHAR(255) NOT NULL,
+    group_member_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY idx_adsh (adsh, group_member),
+    PRIMARY KEY (adsh, group_member, group_member_sequence),
     FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -856,6 +860,7 @@ DROP TABLE IF EXISTS submission_merger;
 CREATE TABLE submission_merger (
     pvid BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     adsh VARCHAR(20) NOT NULL,
+    merger_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing',
     merger_data TEXT NOT NULL COMMENT 'JSON or text data for merger information',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -870,12 +875,27 @@ DROP TABLE IF EXISTS submission_target_data;
 CREATE TABLE submission_target_data (
     pvid BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
     adsh VARCHAR(20) NOT NULL,
+    target_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing',
     target_data TEXT NOT NULL COMMENT 'JSON or text data for target information',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_adsh (adsh),
     FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- ALTER STATEMENTS FOR SCHEMA UPDATES
+-- ============================================================================
+-- Add sequence columns (run manually if upgrading existing database)
+-- ALTER TABLE submission_entity ADD COLUMN entity_sequence INT NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing' AFTER filer_code;
+-- ALTER TABLE submission_former_name ADD COLUMN former_name_sequence INT NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing' AFTER date_changed;
+-- ALTER TABLE submission_references_429 ADD COLUMN reference_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing' AFTER reference_429;
+-- ALTER TABLE submission_group_members ADD COLUMN group_member_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing' AFTER group_member;
+-- ALTER TABLE submission_merger ADD COLUMN merger_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing' AFTER adsh;
+-- ALTER TABLE submission_target_data ADD COLUMN target_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing' AFTER adsh;
+
+-- Drop item_sequence column if it exists (items are naturally ordered by item_code)
+-- ALTER TABLE submission_item DROP COLUMN item_sequence;
 
 -- ============================================================================
 -- TRIGGERS FOR MODIFIED TIMESTAMPS
