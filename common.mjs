@@ -394,14 +394,17 @@ export const fetchSubmissionMetadata = async function(adsh) {
             submission.public_reference_acc = submissionRow.public_reference_acc;
         }
         if (submissionRow.reference_462b) submission.reference_462b = submissionRow.reference_462b;
-        if (submissionRow.confirming_copy) submission.confirming_copy = submissionRow.confirming_copy;
-        if (submissionRow.private_to_public) submission.private_to_public = submissionRow.private_to_public;
+        // Convert confirming_copy from DB string "1" back to boolean true
+        if (submissionRow.confirming_copy) submission.confirming_copy = true;
+        // Convert private_to_public from DB string "1" back to boolean true  
+        if (submissionRow.private_to_public) submission.private_to_public = true;
         
         // ABS fields
         if (submissionRow.abs_asset_class) submission.abs_asset_class = submissionRow.abs_asset_class;
         if (submissionRow.abs_sub_asset_class) {
             submission.abs_sub_asset_class = submissionRow.abs_sub_asset_class;
         }
+        if (submissionRow.abs_rule) submission.abs_rule = submissionRow.abs_rule;
         
         // Filer status fields
         if (submissionRow.is_filer_a_new_registrant) {
@@ -434,8 +437,8 @@ export const fetchSubmissionMetadata = async function(adsh) {
         if (submissionRow.calendar_year_ending) {
             submission.calendar_year_ending = submissionRow.calendar_year_ending;
         }
-        if (submissionRow.depositor_cik) submission.depositor_cik = submissionRow.depositor_cik;
-        if (submissionRow.sponsor_cik) submission.sponsor_cik = submissionRow.sponsor_cik;
+        if (submissionRow.depositor_cik) submission.depositor_cik = common.formatCIK(submissionRow.depositor_cik);
+        if (submissionRow.sponsor_cik) submission.sponsor_cik = common.formatCIK(submissionRow.sponsor_cik);
         if (submissionRow.resource_ext_issuer) {
             submission.resource_ext_issuer = submissionRow.resource_ext_issuer;
         }
@@ -529,7 +532,7 @@ export const fetchSubmissionMetadata = async function(adsh) {
             
             // Query former names for this entity
             const formerNameRows = await runQuery('POC',
-                'SELECT * FROM submission_former_name WHERE adsh = ? AND cik = ? ORDER BY former_name_sequence desc',
+                'SELECT * FROM submission_former_name WHERE adsh = ? AND cik = ? ORDER BY former_name_sequence',
                 [adsh, entityRow.cik]);
             
             if (formerNameRows && formerNameRows.length > 0) {
@@ -588,7 +591,8 @@ export const fetchSubmissionMetadata = async function(adsh) {
                 };
                 
                 if (seriesRow.owner_cik) {
-                    series.owner_cik = seriesRow.owner_cik;
+                    // Pad owner_cik with leading zeros to match file format (10 digits)
+                    series.owner_cik = seriesRow.owner_cik.toString().padStart(10, '0');
                 }
                 
                 // Query class contracts for this series

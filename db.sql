@@ -716,6 +716,7 @@ CREATE TABLE submission (
     -- ABS-related fields
     abs_asset_class VARCHAR(50) DEFAULT NULL COMMENT 'ABS asset class',
     abs_sub_asset_class VARCHAR(50) DEFAULT NULL COMMENT 'ABS sub asset class',
+    abs_rule VARCHAR(255) DEFAULT NULL COMMENT 'ABS rule',
     -- Filer status fields
     is_filer_a_new_registrant CHAR(1) DEFAULT NULL COMMENT 'New registrant flag',
     is_filer_a_well_known_seasoned_issuer CHAR(1) DEFAULT NULL COMMENT 'Well-known seasoned issuer flag',
@@ -732,7 +733,7 @@ CREATE TABLE submission (
     depositor_cik BIGINT UNSIGNED DEFAULT NULL COMMENT 'Depositor CIK',
     sponsor_cik BIGINT UNSIGNED DEFAULT NULL COMMENT 'Sponsor CIK',
     resource_ext_issuer VARCHAR(10) DEFAULT NULL COMMENT 'Resource external issuer',
-    timestamp VARCHAR(14) DEFAULT NULL COMMENT 'Timestamp YYYYMMDDHHmmss',
+    timestamp VARCHAR(30) DEFAULT NULL COMMENT 'Timestamp YYYYMMDDHHmmss',
     -- System fields
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -785,13 +786,13 @@ CREATE TABLE submission_entity (
 
 
 -- ----------------------------------------------------------------------------
--- submission_former_name: Company Former names
+-- submission_former_name: Company Former names (name field is case sensitive collation as new name can  be just a change in capitilization 
 -- ----------------------------------------------------------------------------
 CREATE TABLE submission_former_name (
     adsh VARCHAR(20) NOT NULL,
     cik BIGINT UNSIGNED NOT NULL,
     former_name_sequence SMALLINT UNSIGNED NOT NULL COMMENT 'Preserves array order from original filing',
-    former_conformed_name VARCHAR(255) NOT NULL,
+    former_conformed_name VARCHAR(500) NOT NULL COLLATE utf8mb4_bin, 
     date_changed VARCHAR(8) NOT NULL COMMENT 'YYYYMMDD format; multiple changes on same date are possible',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

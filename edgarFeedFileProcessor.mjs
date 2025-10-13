@@ -429,13 +429,16 @@ export async function processFeedFile(processInfo) {
                     file_number, film_number, is_paper,
                     ma_i_individual, previous_accession_number, withdrawn_accession_number,
                     public_reference_acc, reference_462b, confirming_copy, private_to_public,
-                    abs_asset_class, abs_sub_asset_class,
+                    abs_asset_class, abs_sub_asset_class, abs_rule,
                     is_filer_a_new_registrant, is_filer_a_well_known_seasoned_issuer,
                     is_fund_24f2_eligible, filed_pursuant_to_general_instruction_a2,
                     registered_entity, no_annual_activity, no_initial_period_activity,
                     no_quarterly_activity, category, calendar_year_ending,
                     depositor_cik, sponsor_cik, resource_ext_issuer, timestamp
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+                          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+                          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 
+                          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     type = VALUES(type),
                     public = VALUES(public),
@@ -461,6 +464,7 @@ export async function processFeedFile(processInfo) {
                     private_to_public = VALUES(private_to_public),
                     abs_asset_class = VALUES(abs_asset_class),
                     abs_sub_asset_class = VALUES(abs_sub_asset_class),
+                    abs_rule = VALUES(abs_rule),
                     is_filer_a_new_registrant = VALUES(is_filer_a_new_registrant),
                     is_filer_a_well_known_seasoned_issuer = VALUES(is_filer_a_well_known_seasoned_issuer),
                     is_fund_24f2_eligible = VALUES(is_fund_24f2_eligible),
@@ -504,6 +508,7 @@ export async function processFeedFile(processInfo) {
                 jsonMetaData.private_to_public || null,
                 jsonMetaData.abs_asset_class || null,
                 jsonMetaData.abs_sub_asset_class || null,
+                jsonMetaData.abs_rule || null,
                 jsonMetaData.is_filer_a_new_registrant || null,
                 jsonMetaData.is_filer_a_well_known_seasoned_issuer || null,
                 jsonMetaData.is_fund_24f2_eligible || null,

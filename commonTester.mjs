@@ -81,7 +81,7 @@ try {
     
     for (const subfolder of subfolders) {
         if (!subfolder.isDirectory()) continue;
-        if (filesProcessed >= 1000) break;
+        if (filesProcessed >= 10000) break;
         
         const subfolderPath = join(filingsDir, subfolder.name);
         const files = await readdir(subfolderPath);
@@ -124,8 +124,8 @@ try {
                     // Show detailed diff for debugging (first file only)
                     if (filesProcessed === 0) {
                         console.log(`\n  Detailed comparison (first file):`);
-                        console.log(`  File data:`, JSON.stringify(cleanedFileMetadata.submission, null, 2).substring(0, 500));
-                        console.log(`  DB data:`, JSON.stringify(metadataFromDb.submission, null, 2).substring(0, 500));
+                        console.log(`  File data:`, JSON.stringify(cleanedFileMetadata.submission, null, 2).substring(0, 1000));
+                        console.log(`  DB data:`, JSON.stringify(metadataFromDb.submission, null, 2).substring(0, 1000));
                     }
                     
                     filesWithDifferences++;
@@ -156,8 +156,6 @@ function cleanMetadataForComparison(metadata) {
     const cleaned = JSON.parse(JSON.stringify(metadata)); // Deep clone
     
     if (cleaned.submission) {
-        // Remove fields not stored in submission table
-        delete cleaned.submission.period_start;
         
         // Handle items vs item (plural vs singular) - rename items to item if present
         if (cleaned.submission.items) {
@@ -173,33 +171,14 @@ function cleanMetadataForComparison(metadata) {
             });
         }
         
-        // Sort arrays to handle order differences (DB may return in different order)
-        // Sort former_company arrays by date and name
-        const sortFormerCompanies = (entity) => {
-            if (entity.former_company && Array.isArray(entity.former_company)) {
-                entity.former_company.sort((a, b) => {
-                    const dateCompare = (a.date_changed || '').localeCompare(b.date_changed || '');
-                    if (dateCompare !== 0) return dateCompare;
-                    return (a.former_conformed_name || '').localeCompare(b.former_conformed_name || '');
-                });
-            }
-            if (entity.former_name && Array.isArray(entity.former_name)) {
-                entity.former_name.sort((a, b) => {
-                    const dateCompare = (a.date_changed || '').localeCompare(b.date_changed || '');
-                    if (dateCompare !== 0) return dateCompare;
-                    return (a.former_conformed_name || '').localeCompare(b.former_conformed_name || '');
-                });
-            }
-        };
-        
-        // Normalize empty strings to null and sort arrays
+        // Normalize entities (no longer sorting former_company/former_name arrays 
+        // since we now have sequence fields to preserve order)
         const normalizeEntity = (entity) => {
             // Convert empty organization_name to null (matches writeSubmissionHeaderRecords behavior)
             const entityData = entity.company_data || entity.owner_data;
             if (entityData && entityData.organization_name === '') {
                 delete entityData.organization_name;
             }
-            sortFormerCompanies(entity);
         };
         
         // Apply normalization and sorting to all entity types
@@ -228,7 +207,7 @@ function compareObjects(obj1, obj2, path) {
     const isObject = (val) => val !== null && typeof val === 'object' && !Array.isArray(val);
     
     // Helper to format value for display (truncate if too long)
-    const formatValue = (val, maxLength = 400) => {
+    const formatValue = (val, maxLength = 10000) => {
         const str = JSON.stringify(val);
         if (str.length > maxLength) {
             return str.substring(0, maxLength) + '...';
