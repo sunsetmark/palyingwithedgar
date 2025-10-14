@@ -90,7 +90,7 @@ try {
         const jsonFiles = files.filter(f => f.endsWith('.nc.json'));
         
         // Only process if there's exactly one .nc.json file
-        if (jsonFiles.length === 1) {
+        if (files.length == 2 && jsonFiles.length === 1) {  //don't check folders with a correction as the DB values will be changed = false error
             const jsonFilePath = join(subfolderPath, jsonFiles[0]);
             
             try {

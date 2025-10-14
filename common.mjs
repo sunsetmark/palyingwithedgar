@@ -582,8 +582,10 @@ export const fetchSubmissionMetadata = async function(adsh) {
         
         if (seriesRows && seriesRows.length > 0) {
             const newSeries = [];
+            const newClassesContracts = [];
             const existingSeries = [];
             let ownerCikForNew = null;
+            let ownerCikForNewClasses = null;
             
             for (const seriesRow of seriesRows) {
                 const series = {
@@ -612,14 +614,19 @@ export const fetchSubmissionMetadata = async function(adsh) {
                     });
                 }
                 
-                if (seriesRow.is_new) {
-                    // For new series, owner_cik goes at the parent level
+                // Determine which array to add to based on series_source
+                if (seriesRow.series_source === 'new_series') {
                     newSeries.push(series);
                     if (ownerCikFormatted && !ownerCikForNew) {
                         ownerCikForNew = ownerCikFormatted;
                     }
+                } else if (seriesRow.series_source === 'new_classes_contracts') {
+                    newClassesContracts.push(series);
+                    if (ownerCikFormatted && !ownerCikForNewClasses) {
+                        ownerCikForNewClasses = ownerCikFormatted;
+                    }
                 } else {
-                    // For existing series, owner_cik goes inside each series object
+                    // existing_series - owner_cik goes inside each series object
                     if (ownerCikFormatted) {
                         series.owner_cik = ownerCikFormatted;
                     }
@@ -627,7 +634,7 @@ export const fetchSubmissionMetadata = async function(adsh) {
                 }
             }
             
-            if (newSeries.length > 0 || existingSeries.length > 0) {
+            if (newSeries.length > 0 || newClassesContracts.length > 0 || existingSeries.length > 0) {
                 submission.series_and_classes_contracts_data = {};
                 
                 if (existingSeries.length > 0) {
@@ -644,6 +651,16 @@ export const fetchSubmissionMetadata = async function(adsh) {
                         newContract.owner_cik = ownerCikForNew;
                     }
                     submission.series_and_classes_contracts_data.new_series_and_classes_contracts = newContract;
+                }
+                
+                if (newClassesContracts.length > 0) {
+                    const newClassesContract = {
+                        new_classes_contracts: newClassesContracts
+                    };
+                    if (ownerCikForNewClasses) {
+                        newClassesContract.owner_cik = ownerCikForNewClasses;
+                    }
+                    submission.series_and_classes_contracts_data.new_series_and_classes_contracts = newClassesContract;
                 }
             }
         }

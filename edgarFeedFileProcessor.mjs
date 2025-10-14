@@ -688,7 +688,7 @@ export async function processFeedFile(processInfo) {
             if (jsonMetaData.series_and_classes_contracts_data) {
                 const seriesData = jsonMetaData.series_and_classes_contracts_data;
                 
-                const processSeries = (seriesArray, isNew, globalOwnerCik) => {
+                const processSeries = (seriesArray, globalOwnerCik, seriesSource) => {
                     if (!seriesArray || !Array.isArray(seriesArray)) return;
                     
                     seriesArray.forEach(series => {
@@ -697,17 +697,17 @@ export async function processFeedFile(processInfo) {
                             const ownerCik = globalOwnerCik || series.owner_cik;
                             
                             const seriesQuery = `
-                                INSERT INTO submission_series (adsh, series_id, owner_cik, series_name, is_new)
+                                INSERT INTO submission_series (adsh, series_id, owner_cik, series_name, series_source)
                                 VALUES (?, ?, ?, ?, ?)
                                 ON DUPLICATE KEY UPDATE
                                     owner_cik = VALUES(owner_cik),
                                     series_name = VALUES(series_name),
-                                    is_new = VALUES(is_new)
+                                    series_source = VALUES(series_source)
                             `;
                             
                             // Insert series first, then insert class contracts
                             const seriesPromise = common.runQuery('POC', seriesQuery, [
-                                adsh, seriesIdBigint, ownerCik, series.series_name, isNew ? 1 : 0
+                                adsh, seriesIdBigint, ownerCik, series.series_name, seriesSource
                             ]).then(() => {
                                 // Process class contracts after series is inserted
                                 if (series.class_contract && Array.isArray(series.class_contract)) {
@@ -743,16 +743,27 @@ export async function processFeedFile(processInfo) {
                 if (seriesData.existing_series_and_classes_contracts) {
                     processSeries(
                         seriesData.existing_series_and_classes_contracts.series,
-                        false,
-                        seriesData.existing_series_and_classes_contracts.owner_cik
+                        seriesData.existing_series_and_classes_contracts.owner_cik,
+                        'existing_series'
                     );
                 }
                 if (seriesData.new_series_and_classes_contracts) {
-                    processSeries(
-                        seriesData.new_series_and_classes_contracts.new_series,
-                        true,
-                        seriesData.new_series_and_classes_contracts.owner_cik
-                    );
+                    // Handle new_series (N-1A, POS AMI forms)
+                    if (seriesData.new_series_and_classes_contracts.new_series) {
+                        processSeries(
+                            seriesData.new_series_and_classes_contracts.new_series,
+                            seriesData.new_series_and_classes_contracts.owner_cik,
+                            'new_series'
+                        );
+                    }
+                    // Handle new_classes_contracts (485APOS, 485BPOS, N-6 forms)
+                    if (seriesData.new_series_and_classes_contracts.new_classes_contracts) {
+                        processSeries(
+                            seriesData.new_series_and_classes_contracts.new_classes_contracts,
+                            seriesData.new_series_and_classes_contracts.owner_cik,
+                            'new_classes_contracts'
+                        );
+                    }
                 }
             }
 

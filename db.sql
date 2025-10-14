@@ -793,12 +793,11 @@ CREATE TABLE submission_former_name (
     adsh VARCHAR(20) NOT NULL,
     cik BIGINT UNSIGNED NOT NULL,
     former_name_sequence SMALLINT UNSIGNED NOT NULL COMMENT 'Preserves array order from original filing',
-    former_conformed_name VARCHAR(500) NOT NULL COLLATE utf8mb4_bin, 
+    former_conformed_name VARCHAR(500) NOT NULL, 
     date_changed VARCHAR(8) NOT NULL COMMENT 'YYYYMMDD format; multiple changes on same date are possible',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (adsh, cik, former_name_sequence),
-    UNIQUE KEY (adsh, cik, date_changed, former_conformed_name),
     FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -826,7 +825,7 @@ CREATE TABLE submission_series (
     series_id INT UNSIGNED NOT NULL COMMENT 'Series ID as bigint',
     owner_cik BIGINT UNSIGNED NOT NULL,
     series_name VARCHAR(255) NOT NULL,
-    is_new TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 for new series, 0 for existing',
+    series_source ENUM('new_series', 'new_classes_contracts', 'existing_series') NOT NULL DEFAULT 'new_series' COMMENT 'Source property name from original filing',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (adsh, series_id),
@@ -984,6 +983,10 @@ CREATE TABLE submission_rule_item (
 
 -- Drop item_sequence column if it exists (items are naturally ordered by item_code)
 -- ALTER TABLE submission_item DROP COLUMN item_sequence;
+
+-- Add series_source column and remove is_new from submission_series (run manually if upgrading existing database)
+-- ALTER TABLE submission_series ADD COLUMN series_source ENUM('new_series', 'new_classes_contracts', 'existing_series') NOT NULL DEFAULT 'new_series' COMMENT 'Source property name from original filing' AFTER series_name;
+-- ALTER TABLE submission_series DROP COLUMN is_new;
 
 -- Add new fields to submission table (run manually if upgrading existing database)
 -- ALTER TABLE submission ADD COLUMN period_start VARCHAR(8) DEFAULT NULL COMMENT 'Period start date YYYYMMDD' AFTER period;
