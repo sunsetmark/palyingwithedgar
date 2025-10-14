@@ -1,0 +1,218 @@
+<SUBMISSION>
+{{#if paper}}<PAPER>
+{{/if}}<ACCESSION-NUMBER>{{{accession_number}}}
+<TYPE>{{{type}}}
+{{#if category}}<CATEGORY>{{{category}}}
+{{/if~}}
+{{~#if confirming_copy}}<CONFIRMING-COPY>
+{{/if~}}
+{{~#if public_document_count}}<PUBLIC-DOCUMENT-COUNT>{{public_document_count}}
+{{/if~}}
+{{~#if withdrawn_accession_number}}<WITHDRAWN-ACCESSION-NUMBER>{{{withdrawn_accession_number}}}
+{{/if~}}
+{{~#if reference_462b}}<REFERENCE-462B>{{{reference_462b}}}
+{{/if~}}
+{{~#if previous_accession_number}}<PREVIOUS-ACCESSION-NUMBER>{{{previous_accession_number}}}
+{{/if~}}
+{{~#if calendar_year_ending}}<CALENDAR-YEAR-ENDING>{{{calendar_year_ending}}}
+{{/if~}}
+{{~#if ma_i_individual}}<MA-I_INDIVIDUAL>{{{ma_i_individual}}}
+{{/if~}}
+{{~#if rule}}<RULE>
+<RULE-NAME>{{{rule.rule_name}}}
+{{#each rule.item}}<ITEM>
+<ITEM-NUMBER>{{{item_number}}}
+<ITEM-PERIOD>{{{item_period}}}
+</ITEM>
+{{/each}}</RULE>
+{{/if~}}
+{{~#if period}}<PERIOD>{{period}}
+{{/if~}}
+{{~#if depositor_cik}}<DEPOSITOR-CIK>{{{depositor_cik}}}
+{{/if~}}
+{{~#if sponsor_cik}}<SPONSOR-CIK>{{{sponsor_cik}}}
+{{/if~}}
+{{~#each item}}<ITEMS>{{{this}}}
+{{/each~}}
+{{~#each items}}<ITEMS>{{{this}}}
+{{/each~}}
+{{~#each references_429}}<REFERENCES-429>{{{this}}}
+{{/each~}}
+{{~#if resource_ext_issuer}}<RESOURCE-EXT-ISSUER>{{{resource_ext_issuer}}}
+{{/if~}}
+{{~#if filing_date}}<FILING-DATE>{{filing_date}}
+{{/if~}}
+{{~#if public_rel_date}}<PUBLIC-REL-DATE>{{public_rel_date}}
+{{/if~}}
+{{~#if date_of_filing_date_change}}<DATE-OF-FILING-DATE-CHANGE>{{date_of_filing_date_change}}
+{{/if~}}
+{{~#if (isInvestmentCompanyForm type)}}
+{{~#if effectiveness_date}}<EFFECTIVENESS-DATE>{{effectiveness_date}}
+{{/if~}}
+{{~#each filer}}{{> entity entityType="FILER" data=this}}
+{{/each~}}
+{{~#each subject_company}}{{> entity entityType="SUBJECT-COMPANY" data=this}}
+{{/each~}}
+{{~#each reporting_owner}}{{> entity entityType="REPORTING-OWNER" data=this}}
+{{/each~}}
+{{~#if issuer}}{{> entity entityType="ISSUER" data=issuer}}
+{{/if~}}
+{{~#if depositor}}{{> entity entityType="DEPOSITOR" data=depositor}}
+{{/if~}}
+{{~#if securitizer}}{{> entity entityType="SECURITIZER" data=securitizer}}
+{{/if~}}
+{{~#each filed_for}}{{> entity entityType="FILED-FOR" data=this}}
+{{/each~}}
+{{~#if issuing_entity}}{{> entity entityType="ISSUING_ENTITY" data=issuing_entity}}
+{{/if~}}
+{{~#if filed_by}}{{> entity entityType="FILED-BY" data=filed_by}}
+{{/if~}}
+{{~#if underwriter}}{{#if underwriter.length}}{{#each underwriter}}{{> entity entityType="UNDERWRITER" data=this}}
+{{/each}}{{else}}{{> entity entityType="UNDERWRITER" data=underwriter}}
+{{/if}}{{/if~}}
+{{/if~}}
+{{~#unless (isInvestmentCompanyForm type)}}
+{{~#if effectiveness_date}}<EFFECTIVENESS-DATE>{{effectiveness_date}}
+{{/if~}}
+{{/unless~}}
+{{~#if abs_rule}}<ABS-RULE>{{{abs_rule}}}
+{{/if~}}
+{{~#if registered_entity}}<REGISTERED-ENTITY>{{{registered_entity}}}
+{{/if~}}
+{{~#if no_initial_period_activity}}<NO-INITIAL-PERIOD-ACTIVITY>{{{no_initial_period_activity}}}
+{{/if~}}
+{{~#if period_start}}<PERIOD-START>{{period_start}}
+{{/if~}}
+{{~#if no_quarterly_activity}}<NO-QUARTERLY-ACTIVITY>{{{no_quarterly_activity}}}
+{{/if~}}
+{{~#if no_annual_activity}}<NO-ANNUAL-ACTIVITY>{{{no_annual_activity}}}
+{{/if~}}
+{{~#if abs_asset_class}}<ABS-ASSET-CLASS>{{{abs_asset_class}}}
+{{/if~}}
+{{~#if abs_sub_asset_class}}<ABS-SUB-ASSET-CLASS>{{{abs_sub_asset_class}}}
+{{/if~}}
+{{~#if acceptance_datetime}}<ACCEPTANCE-DATETIME>{{acceptance_datetime}}
+{{/if~}}
+{{~#if action_date}}<ACTION-DATE>{{action_date}}
+{{/if~}}
+{{~#if received_date}}<RECEIVED-DATE>{{received_date}}
+{{/if~}}
+{{~#if file_number}}<FILE-NUMBER>{{file_number}}
+{{/if~}}
+{{~#if film_number}}<FILM-NUMBER>{{film_number}}
+{{/if~}}
+{{~#if public_reference_acc}}<PUBLIC-REFERENCE-ACC>{{{public_reference_acc}}}
+{{/if~}}
+{{~#if private_to_public}}<PRIVATE-TO-PUBLIC>
+{{/if~}}
+{{~#if is_filer_a_new_registrant}}<IS-FILER-A-NEW-REGISTRANT>{{{is_filer_a_new_registrant}}}
+{{/if~}}
+{{~#if is_filer_a_well_known_seasoned_issuer}}<IS-FILER-A-WELL-KNOWN-SEASONED-ISSUER>{{{is_filer_a_well_known_seasoned_issuer}}}
+{{/if~}}
+{{~#if filed_pursuant_to_general_instruction_a2}}<FILED-PURSUANT-TO-GENERAL-INSTRUCTION-A2>{{{filed_pursuant_to_general_instruction_a2}}}
+{{/if~}}
+{{~#if is_fund_24f2_eligible}}<IS-FUND-24F2-ELIGIBLE>{{{is_fund_24f2_eligible}}}
+{{/if~}}
+{{~#if timestamp}}<TIMESTAMP>{{{timestamp}}}
+{{/if~}}
+{{~#each group_members}}<GROUP-MEMBERS>{{{this}}}
+{{/each~}}
+{{~#unless (isInvestmentCompanyForm type)}}
+{{~#each filer}}{{> entity entityType="FILER" data=this}}
+{{/each~}}
+{{~#each subject_company}}{{> entity entityType="SUBJECT-COMPANY" data=this}}
+{{/each~}}
+{{~#each reporting_owner}}{{> entity entityType="REPORTING-OWNER" data=this}}
+{{/each~}}
+{{~#if issuer}}{{> entity entityType="ISSUER" data=issuer}}
+{{/if~}}
+{{~#if depositor}}{{> entity entityType="DEPOSITOR" data=depositor}}
+{{/if~}}
+{{~#if securitizer}}{{> entity entityType="SECURITIZER" data=securitizer}}
+{{/if~}}
+{{~#each filed_for}}{{> entity entityType="FILED-FOR" data=this}}
+{{/each~}}
+{{~#if issuing_entity}}{{> entity entityType="ISSUING_ENTITY" data=issuing_entity}}
+{{/if~}}
+{{~#if filed_by}}{{> entity entityType="FILED-BY" data=filed_by}}
+{{/if~}}
+{{~#if underwriter}}{{#if underwriter.length}}{{#each underwriter}}{{> entity entityType="UNDERWRITER" data=this}}
+{{/each}}{{else}}{{> entity entityType="UNDERWRITER" data=underwriter}}
+{{/if}}{{/if~}}
+{{/unless~}}
+{{~#if series_and_classes_contracts_data}}<SERIES-AND-CLASSES-CONTRACTS-DATA>
+{{#if series_and_classes_contracts_data.new_series_and_classes_contracts}}<NEW-SERIES-AND-CLASSES-CONTRACTS>
+{{#if series_and_classes_contracts_data.new_series_and_classes_contracts.owner_cik}}<OWNER-CIK>{{{series_and_classes_contracts_data.new_series_and_classes_contracts.owner_cik}}}
+{{/if~}}
+{{~#each series_and_classes_contracts_data.new_series_and_classes_contracts.new_series}}<NEW-SERIES>
+<SERIES-ID>{{{series_id}}}
+<SERIES-NAME>{{{series_name}}}
+{{#each class_contract}}<CLASS-CONTRACT>
+<CLASS-CONTRACT-ID>{{{class_contract_id}}}
+<CLASS-CONTRACT-NAME>{{{class_contract_name}}}
+{{#if class_contract_ticker_symbol}}<CLASS-CONTRACT-TICKER-SYMBOL>{{{class_contract_ticker_symbol}}}
+{{/if}}</CLASS-CONTRACT>
+{{/each}}</NEW-SERIES>
+{{/each~}}
+{{~#each series_and_classes_contracts_data.new_series_and_classes_contracts.new_classes_contracts}}<NEW-CLASSES-CONTRACTS>
+<SERIES-ID>{{{series_id}}}
+<SERIES-NAME>{{{series_name}}}
+{{#each class_contract}}<CLASS-CONTRACT>
+<CLASS-CONTRACT-ID>{{{class_contract_id}}}
+<CLASS-CONTRACT-NAME>{{{class_contract_name}}}
+{{#if class_contract_ticker_symbol}}<CLASS-CONTRACT-TICKER-SYMBOL>{{{class_contract_ticker_symbol}}}
+{{/if}}</CLASS-CONTRACT>
+{{/each}}</NEW-CLASSES-CONTRACTS>
+{{/each}}</NEW-SERIES-AND-CLASSES-CONTRACTS>
+{{/if~}}
+{{~#if series_and_classes_contracts_data.existing_series_and_classes_contracts}}<EXISTING-SERIES-AND-CLASSES-CONTRACTS>
+{{#each series_and_classes_contracts_data.existing_series_and_classes_contracts.series}}<SERIES>
+<OWNER-CIK>{{{owner_cik}}}
+<SERIES-ID>{{{series_id}}}
+<SERIES-NAME>{{{series_name}}}
+{{#each class_contract}}<CLASS-CONTRACT>
+<CLASS-CONTRACT-ID>{{{class_contract_id}}}
+<CLASS-CONTRACT-NAME>{{{class_contract_name}}}
+{{#if class_contract_ticker_symbol}}<CLASS-CONTRACT-TICKER-SYMBOL>{{{class_contract_ticker_symbol}}}
+{{/if}}</CLASS-CONTRACT>
+{{/each}}</SERIES>
+{{/each}}</EXISTING-SERIES-AND-CLASSES-CONTRACTS>
+{{/if~}}
+{{~#if series_and_classes_contracts_data.merger_series_and_classes_contracts}}<MERGER-SERIES-AND-CLASSES-CONTRACTS>
+{{#each series_and_classes_contracts_data.merger_series_and_classes_contracts.merger}}<MERGER>
+{{#if acquiring_data}}<ACQUIRING-DATA>
+<CIK>{{{acquiring_data.cik}}}
+{{#each acquiring_data.series}}<SERIES>
+<SERIES-ID>{{{series_id}}}
+<SERIES-NAME>{{{series_name}}}
+{{#each class_contract}}<CLASS-CONTRACT>
+<CLASS-CONTRACT-ID>{{{class_contract_id}}}
+<CLASS-CONTRACT-NAME>{{{class_contract_name}}}
+{{#if class_contract_ticker_symbol}}<CLASS-CONTRACT-TICKER-SYMBOL>{{{class_contract_ticker_symbol}}}
+{{/if}}</CLASS-CONTRACT>
+{{/each}}</SERIES>
+{{/each}}</ACQUIRING-DATA>
+{{/if~}}
+{{~#each target_data}}<TARGET-DATA>
+<CIK>{{{cik}}}
+{{#if series}}{{#each series}}<SERIES>
+<SERIES-ID>{{{series_id}}}
+<SERIES-NAME>{{{series_name}}}
+{{#each class_contract}}<CLASS-CONTRACT>
+<CLASS-CONTRACT-ID>{{{class_contract_id}}}
+<CLASS-CONTRACT-NAME>{{{class_contract_name}}}
+{{#if class_contract_ticker_symbol}}<CLASS-CONTRACT-TICKER-SYMBOL>{{{class_contract_ticker_symbol}}}
+{{/if}}</CLASS-CONTRACT>
+{{/each}}</SERIES>
+{{/each}}{{/if}}</TARGET-DATA>
+{{/each}}</MERGER>
+{{/each}}</MERGER-SERIES-AND-CLASSES-CONTRACTS>
+{{/if}}</SERIES-AND-CLASSES-CONTRACTS-DATA>
+{{/if~}}
+{{~#each document}}<DOCUMENT>
+<TYPE>{{{type}}}
+<SEQUENCE>{{sequence}}
+<FILENAME>{{{filename}}}
+{{#if description}}<DESCRIPTION>{{{description}}}
+{{/if}}</DOCUMENT>
+{{/each}}</SUBMISSION>

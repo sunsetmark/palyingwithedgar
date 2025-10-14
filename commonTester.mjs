@@ -81,7 +81,7 @@ try {
     
     for (const subfolder of subfolders) {
         if (!subfolder.isDirectory()) continue;
-        if (filesProcessed >= 10000) break;
+        if (filesProcessed >= 100000) break;
         
         const subfolderPath = join(filingsDir, subfolder.name);
         const files = await readdir(subfolderPath);
@@ -92,7 +92,7 @@ try {
         // Only process if there's exactly one .nc.json file
         if (files.length == 2 && jsonFiles.length === 1) {  //don't check folders with a correction as the DB values will be changed = false error
             const jsonFilePath = join(subfolderPath, jsonFiles[0]);
-            
+
             try {
                 // Read and parse the JSON file
                 const jsonFileBody = await readFile(jsonFilePath, 'utf-8');

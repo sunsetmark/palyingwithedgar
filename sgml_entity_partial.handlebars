@@ -1,0 +1,79 @@
+<{{entityType}}>
+{{#if data.owner_data}}<OWNER-DATA>
+<CONFORMED-NAME>{{{data.owner_data.conformed_name}}}
+<CIK>{{{data.owner_data.cik}}}
+{{#if data.owner_data.assigned_sic}}<ASSIGNED-SIC>{{{data.owner_data.assigned_sic}}}
+{{/if~}}
+{{~#if data.owner_data.organization_name}}<ORGANIZATION-NAME>{{{data.owner_data.organization_name}}}{{else}}{{#if (hasProperty data.owner_data "organization_name")}}<ORGANIZATION-NAME>{{/if}}{{/if}}
+{{#if data.owner_data.irs_number}}<IRS-NUMBER>{{{data.owner_data.irs_number}}}
+{{/if~}}
+{{~#if data.owner_data.state_of_incorporation}}<STATE-OF-INCORPORATION>{{{data.owner_data.state_of_incorporation}}}
+{{/if~}}
+{{~#if data.owner_data.fiscal_year_end}}<FISCAL-YEAR-END>{{{data.owner_data.fiscal_year_end}}}
+{{/if}}
+</OWNER-DATA>
+{{/if~}}
+{{~#if data.company_data}}<COMPANY-DATA>
+<CONFORMED-NAME>{{{data.company_data.conformed_name}}}
+<CIK>{{{data.company_data.cik}}}
+{{#if data.company_data.assigned_sic}}<ASSIGNED-SIC>{{{data.company_data.assigned_sic}}}
+{{/if~}}
+{{~#if data.company_data.organization_name}}<ORGANIZATION-NAME>{{{data.company_data.organization_name}}}{{else}}{{#if (hasProperty data.company_data "organization_name")}}<ORGANIZATION-NAME>{{/if}}{{/if}}
+{{#if data.company_data.irs_number}}<IRS-NUMBER>{{{data.company_data.irs_number}}}
+{{/if~}}
+{{~#if data.company_data.state_of_incorporation}}<STATE-OF-INCORPORATION>{{{data.company_data.state_of_incorporation}}}
+{{/if~}}
+{{~#if data.company_data.fiscal_year_end}}<FISCAL-YEAR-END>{{{data.company_data.fiscal_year_end}}}
+{{/if}}
+</COMPANY-DATA>
+{{/if~}}
+{{~#if data.filing_values}}<FILING-VALUES>
+{{#if data.filing_values.form_type}}<FORM-TYPE>{{{data.filing_values.form_type}}}
+{{/if~}}
+{{~#if data.filing_values.act}}<ACT>{{{data.filing_values.act}}}
+{{/if~}}
+{{~#if data.filing_values.file_number}}<FILE-NUMBER>{{{data.filing_values.file_number}}}
+{{/if~}}
+{{~#if data.filing_values.film_number}}<FILM-NUMBER>{{{data.filing_values.film_number}}}
+{{/if}}
+</FILING-VALUES>
+{{/if~}}
+{{~#if data.business_address}}<BUSINESS-ADDRESS>
+{{#if data.business_address.street1}}<STREET1>{{{data.business_address.street1}}}
+{{/if~}}
+{{~#if data.business_address.street2}}<STREET2>{{{data.business_address.street2}}}
+{{/if~}}
+{{~#if data.business_address.city}}<CITY>{{{data.business_address.city}}}
+{{/if~}}
+{{~#if data.business_address.state}}<STATE>{{{data.business_address.state}}}
+{{/if~}}
+{{~#if data.business_address.zip}}<ZIP>{{{data.business_address.zip}}}
+{{/if~}}
+{{~#if data.business_address.phone}}<PHONE>{{{data.business_address.phone}}}
+{{/if}}
+</BUSINESS-ADDRESS>
+{{/if~}}
+{{~#if data.mail_address}}<MAIL-ADDRESS>
+{{#if data.mail_address.street1}}<STREET1>{{{data.mail_address.street1}}}
+{{/if~}}
+{{~#if data.mail_address.street2}}<STREET2>{{{data.mail_address.street2}}}
+{{/if~}}
+{{~#if data.mail_address.city}}<CITY>{{{data.mail_address.city}}}
+{{/if~}}
+{{~#if data.mail_address.state}}<STATE>{{{data.mail_address.state}}}
+{{/if~}}
+{{~#if data.mail_address.zip}}<ZIP>{{{data.mail_address.zip}}}
+{{/if}}
+</MAIL-ADDRESS>
+{{/if~}}
+{{~#each data.former_company}}<FORMER-COMPANY>
+<FORMER-CONFORMED-NAME>{{{former_conformed_name}}}
+<DATE-CHANGED>{{{date_changed}}}
+</FORMER-COMPANY>
+{{/each~}}
+{{~#each data.former_name}}<FORMER-NAME>
+<FORMER-CONFORMED-NAME>{{{former_conformed_name}}}
+<DATE-CHANGED>{{{date_changed}}}
+</FORMER-NAME>
+{{/each}}
+</{{entityType}}>
