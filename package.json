@@ -15,7 +15,8 @@
     "handlebars": "^4.7.8",
     "mysql2": "^3.14.5",
     "node-fetch": "^3.3.2",
-    "uuencode": "^0.0.4"
+    "uuencode": "^0.0.4",
+    "validate-with-xmllint": "^1.2.1"
   },
   "devDependencies": {
     "@types/node": "^20.19.13"

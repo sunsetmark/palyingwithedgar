@@ -1,10 +1,15 @@
 // Common utility functions for AWS services and other project-wide functionality
 import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
-import { createReadStream } from 'fs';
+import { createReadStream, createWriteStream } from 'fs';
+import { unlink, mkdtemp, readFile as fsReadFile } from 'fs/promises';
 import { Readable } from 'stream';
 import { createGunzip } from 'zlib';
 import { promisify } from 'util';
+import { pipeline } from 'stream/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { validateXMLWithXSD } from 'validate-with-xmllint';
 import mysql from 'mysql2/promise';
 import { config } from './config.mjs';
 
@@ -865,6 +870,139 @@ export const fetchSubmissionMetadata = async function(adsh) {
     }
 };
 
+/**
+ * Validate XML file from S3 against one or more XSD schemas
+ * @param {Object} xmlS3Source - Object with bucket and key properties for XML file
+ * @param {Array} xsdS3Sources - Array of objects with bucket, key, and run properties
+ * @returns {Object} Validation results with validated, warningCount, errorCount, and validationDetails
+ */
+export const validateXML = async (xmlS3Source, xsdS3Sources) => {
+    let tempDir = null;
+    const tempFiles = [];
+    
+    try {
+        // Create a temporary directory for our files
+        tempDir = await mkdtemp(join(tmpdir(), 'xml-validation-'));
+        
+        // Download XML file from S3 to temp directory (using stream for large files)
+        const xmlTempPath = join(tempDir, 'input.xml');
+        const xmlStream = await s3ReadStream(xmlS3Source.bucket, xmlS3Source.key);
+        const xmlWriteStream = createWriteStream(xmlTempPath);
+        await pipeline(xmlStream, xmlWriteStream);
+        tempFiles.push(xmlTempPath);
+        
+        // Download all XSD files to temp directory (they're smaller, so we can use strings)
+        const xsdPaths = [];
+        for (const xsdSource of xsdS3Sources) {
+            const xsdFileName = xsdSource.key.split('/').pop();
+            const xsdTempPath = join(tempDir, xsdFileName);
+            const xsdContent = await s3ReadString(xsdSource.bucket, xsdSource.key);
+            const { writeFile } = await import('fs/promises');
+            await writeFile(xsdTempPath, xsdContent);
+            tempFiles.push(xsdTempPath);
+            xsdPaths.push({
+                path: xsdTempPath,
+                key: xsdSource.key,
+                run: xsdSource.run !== false // Default to true if not specified
+            });
+        }
+        
+        // Read the XML file into memory
+        // Note: For very large files (2GB), validate-with-xmllint pipes content to xmllint's stdin,
+        // so it doesn't load the entire file into memory during validation
+        const xmlContent = await fsReadFile(xmlTempPath, 'utf-8');
+        
+        // Validate against each XSD where run=true
+        const validationDetails = [];
+        let totalWarnings = 0;
+        let totalErrors = 0;
+        let overallValid = true;
+        
+        for (const xsdInfo of xsdPaths) {
+            if (!xsdInfo.run) continue;
+            
+            const warnings = [];
+            const errors = [];
+            
+            try {
+                // Validate using the validate-with-xmllint package
+                // This function takes XML content (string) and XSD file path
+                await validateXMLWithXSD(xmlContent, xsdInfo.path);
+                
+                // If we reach here, validation passed (no errors)
+                
+            } catch (validationError) {
+                // Parse the error message for warnings and errors
+                // The error message contains the xmllint output
+                const errorMessage = validationError.message || validationError.toString();
+                const lines = errorMessage.split('\n');
+                
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    
+                    // Skip the error prefix line
+                    if (line.startsWith('xmllint exited with code')) {
+                        continue;
+                    }
+                    
+                    // Skip success messages
+                    if (line.includes('validates') && !line.includes('fails')) {
+                        continue;
+                    }
+                    
+                    // Categorize as warning or error
+                    const lowerLine = line.toLowerCase();
+                    if (lowerLine.includes('warning')) {
+                        warnings.push(line.trim());
+                        totalWarnings++;
+                    } else if (lowerLine.includes('error') || 
+                               lowerLine.includes('fails to validate') ||
+                               (line.includes(':') && !lowerLine.includes('validates'))) {
+                        errors.push(line.trim());
+                        totalErrors++;
+                        overallValid = false;
+                    }
+                }
+            }
+            
+            validationDetails.push({
+                xsd: xsdInfo.key,
+                warnings: warnings,
+                errors: errors
+            });
+        }
+        
+        return {
+            validated: overallValid,
+            warningCount: totalWarnings,
+            errorCount: totalErrors,
+            validationDetails: validationDetails
+        };
+        
+    } catch (error) {
+        throw new Error(`validateXML Error: ${error.message}`);
+    } finally {
+        // Clean up temporary files
+        for (const tempFile of tempFiles) {
+            try {
+                await unlink(tempFile);
+            } catch (cleanupError) {
+                // Ignore cleanup errors
+            }
+        }
+        
+        // Clean up temporary directory
+        if (tempDir) {
+            try {
+                const { rmdir } = await import('fs/promises');
+                await rmdir(tempDir);
+            } catch (cleanupError) {
+                // Ignore cleanup errors
+            }
+        }
+    }
+};
+
 // Export common object with all functions
 export const common = {
     s3ReadString,
@@ -882,5 +1020,6 @@ export const common = {
     formatIndexKey,
     formatAccessionNumber,
     extractIntId,
-    fetchSubmissionMetadata
+    fetchSubmissionMetadata,
+    validateXML
 };

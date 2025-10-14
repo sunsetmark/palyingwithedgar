@@ -10,6 +10,12 @@ config.mjs
 #update scripts
 db_migration.sql
 
+//test result files
+test_*.txt
+testFetchMeta.mjs
+testFormerNames.mjs
+testSgmlTemplate.mjs
+
 # Runtime data
 pids
 *.pid
