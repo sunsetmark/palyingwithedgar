@@ -380,7 +380,7 @@ export const fetchSubmissionMetadata = async function(adsh) {
         if (submissionRow.public_rel_date) submission.public_rel_date = submissionRow.public_rel_date;
         if (submissionRow.file_number) submission.file_number = submissionRow.file_number;
         if (submissionRow.film_number) submission.film_number = submissionRow.film_number;
-        if (submissionRow.is_paper) submission.is_paper = submissionRow.is_paper;
+        if (submissionRow.is_paper) submission.paper = true;
         
         // Additional metadata fields
         if (submissionRow.ma_i_individual) submission.ma_i_individual = submissionRow.ma_i_individual;
@@ -583,6 +583,7 @@ export const fetchSubmissionMetadata = async function(adsh) {
         if (seriesRows && seriesRows.length > 0) {
             const newSeries = [];
             const existingSeries = [];
+            let ownerCikForNew = null;
             
             for (const seriesRow of seriesRows) {
                 const series = {
@@ -590,10 +591,8 @@ export const fetchSubmissionMetadata = async function(adsh) {
                     series_name: seriesRow.series_name
                 };
                 
-                if (seriesRow.owner_cik) {
-                    // Pad owner_cik with leading zeros to match file format (10 digits)
-                    series.owner_cik = seriesRow.owner_cik.toString().padStart(10, '0');
-                }
+                // Format owner_cik with leading zeros
+                const ownerCikFormatted = seriesRow.owner_cik ? seriesRow.owner_cik.toString().padStart(10, '0') : null;
                 
                 // Query class contracts for this series
                 const classRows = await runQuery('POC',
@@ -614,8 +613,16 @@ export const fetchSubmissionMetadata = async function(adsh) {
                 }
                 
                 if (seriesRow.is_new) {
+                    // For new series, owner_cik goes at the parent level
                     newSeries.push(series);
+                    if (ownerCikFormatted && !ownerCikForNew) {
+                        ownerCikForNew = ownerCikFormatted;
+                    }
                 } else {
+                    // For existing series, owner_cik goes inside each series object
+                    if (ownerCikFormatted) {
+                        series.owner_cik = ownerCikFormatted;
+                    }
                     existingSeries.push(series);
                 }
             }
@@ -630,9 +637,13 @@ export const fetchSubmissionMetadata = async function(adsh) {
                 }
                 
                 if (newSeries.length > 0) {
-                    submission.series_and_classes_contracts_data.new_series_and_classes_contracts = {
+                    const newContract = {
                         new_series: newSeries
                     };
+                    if (ownerCikForNew) {
+                        newContract.owner_cik = ownerCikForNew;
+                    }
+                    submission.series_and_classes_contracts_data.new_series_and_classes_contracts = newContract;
                 }
             }
         }
@@ -663,24 +674,147 @@ export const fetchSubmissionMetadata = async function(adsh) {
             submission.group_members = groupMembersRows.map(row => row.group_member);
         }
         
-        // Query merger data
+        // Query merger data (N-14 forms)
         const mergerRows = await runQuery('POC',
-            'SELECT merger_data FROM submission_merger WHERE adsh = ? ORDER BY merger_sequence', 
+            'SELECT merger_sequence FROM submission_merger WHERE adsh = ? ORDER BY merger_sequence', 
             [adsh]);
         
         if (mergerRows && mergerRows.length > 0) {
-            // Parse JSON strings back into objects
-            submission.merger = mergerRows.map(row => JSON.parse(row.merger_data));
-        }
-        
-        // Query target_data
-        const targetRows = await runQuery('POC',
-            'SELECT target_data FROM submission_target_data WHERE adsh = ? ORDER BY target_sequence', 
-            [adsh]);
-        
-        if (targetRows && targetRows.length > 0) {
-            // Parse JSON strings back into objects
-            submission.target_data = targetRows.map(row => JSON.parse(row.target_data));
+            const mergers = [];
+            
+            for (const mergerRow of mergerRows) {
+                const mergerSequence = mergerRow.merger_sequence;
+                const merger = {};
+                
+                // Query acquiring series (series_type = 'A')
+                const acquiringSeriesRows = await runQuery('POC',
+                    `SELECT * FROM submission_merger_series 
+                     WHERE adsh = ? AND merger_sequence = ? AND series_type = 'A'
+                     ORDER BY series_sequence`, 
+                    [adsh, mergerSequence]);
+                
+                if (acquiringSeriesRows && acquiringSeriesRows.length > 0) {
+                    // Group by entity_cik (should only be one for acquiring)
+                    const acquiringCik = acquiringSeriesRows[0].entity_cik.toString().padStart(10, '0');
+                    const seriesArray = [];
+                    
+                    for (const seriesRow of acquiringSeriesRows) {
+                        const series = {
+                            series_id: formatSeriesId(seriesRow.series_id),
+                            series_name: seriesRow.series_name
+                        };
+                        
+                        // Query class contracts for this series
+                        const classRows = await runQuery('POC',
+                            `SELECT * FROM submission_merger_class_contract 
+                             WHERE adsh = ? AND merger_sequence = ? AND series_type = 'A' 
+                             AND entity_cik = ? AND series_id = ?
+                             ORDER BY class_sequence`,
+                            [adsh, mergerSequence, seriesRow.entity_cik, seriesRow.series_id]);
+                        
+                        if (classRows && classRows.length > 0) {
+                            series.class_contract = classRows.map(cc => {
+                                const classObj = {
+                                    class_contract_id: formatClassId(cc.class_contract_id),
+                                    class_contract_name: cc.class_contract_name
+                                };
+                                if (cc.class_contract_ticker_symbol) {
+                                    classObj.class_contract_ticker_symbol = cc.class_contract_ticker_symbol;
+                                }
+                                return classObj;
+                            });
+                        }
+                        
+                        seriesArray.push(series);
+                    }
+                    
+                    merger.acquiring_data = {
+                        cik: acquiringCik,
+                        series: seriesArray
+                    };
+                }
+                
+                // Query target series (series_type = 'T')
+                const targetSeriesRows = await runQuery('POC',
+                    `SELECT * FROM submission_merger_series 
+                     WHERE adsh = ? AND merger_sequence = ? AND series_type = 'T'
+                     ORDER BY entity_sequence, series_sequence`, 
+                    [adsh, mergerSequence]);
+                
+                if (targetSeriesRows && targetSeriesRows.length > 0) {
+                    // Group by entity_cik and entity_sequence
+                    const targetDataMap = new Map();
+                    
+                    for (const seriesRow of targetSeriesRows) {
+                        const key = `${seriesRow.entity_cik}_${seriesRow.entity_sequence}`;
+                        
+                        if (!targetDataMap.has(key)) {
+                            targetDataMap.set(key, {
+                                cik: seriesRow.entity_cik.toString().padStart(10, '0'),
+                                entity_sequence: seriesRow.entity_sequence,
+                                series: []
+                            });
+                        }
+                        
+                        // Check if this is a CIK-only entry (series_id is NULL)
+                        if (seriesRow.series_id === null) {
+                            // CIK-only entry, don't add series
+                            continue;
+                        }
+                        
+                        const series = {
+                            series_id: formatSeriesId(seriesRow.series_id),
+                            series_name: seriesRow.series_name
+                        };
+                        
+                        // Query class contracts for this series
+                        const classRows = await runQuery('POC',
+                            `SELECT * FROM submission_merger_class_contract 
+                             WHERE adsh = ? AND merger_sequence = ? AND series_type = 'T' 
+                             AND entity_cik = ? AND entity_sequence = ? AND series_id = ?
+                             ORDER BY class_sequence`,
+                            [adsh, mergerSequence, seriesRow.entity_cik, seriesRow.entity_sequence, seriesRow.series_id]);
+                        
+                        if (classRows && classRows.length > 0) {
+                            series.class_contract = classRows.map(cc => {
+                                const classObj = {
+                                    class_contract_id: formatClassId(cc.class_contract_id),
+                                    class_contract_name: cc.class_contract_name
+                                };
+                                if (cc.class_contract_ticker_symbol) {
+                                    classObj.class_contract_ticker_symbol = cc.class_contract_ticker_symbol;
+                                }
+                                return classObj;
+                            });
+                        }
+                        
+                        targetDataMap.get(key).series.push(series);
+                    }
+                    
+                    // Convert map to array, sorted by entity_sequence
+                    // Remove series array if empty (for CIK-only targets)
+                    merger.target_data = Array.from(targetDataMap.values())
+                        .sort((a, b) => a.entity_sequence - b.entity_sequence)
+                        .map(({ cik, series }) => {
+                            if (series.length === 0) {
+                                return { cik };  // CIK-only target
+                            }
+                            return { cik, series };  // Target with series
+                        });
+                }
+                
+                mergers.push(merger);
+            }
+            
+            // Add to series_and_classes_contracts_data if we have mergers
+            if (mergers.length > 0) {
+                if (!submission.series_and_classes_contracts_data) {
+                    submission.series_and_classes_contracts_data = {};
+                }
+                submission.series_and_classes_contracts_data.merger_series_and_classes_contracts = {
+                    merger: mergers
+                };
+            }
         }
         
         // Query rule data

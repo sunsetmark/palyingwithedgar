@@ -498,7 +498,7 @@ export async function processFeedFile(processInfo) {
                 jsonMetaData.public_rel_date || null,
                 jsonMetaData.file_number || null,
                 jsonMetaData.film_number || null,
-                jsonMetaData.is_paper ? 1 : 0,
+                jsonMetaData.paper ? 1 : 0,
                 jsonMetaData.ma_i_individual || null,
                 jsonMetaData.previous_accession_number || null,
                 jsonMetaData.withdrawn_accession_number || null,
@@ -814,40 +814,147 @@ export async function processFeedFile(processInfo) {
                 });
             }
 
-            // Process merger data
-            if (jsonMetaData.merger && Array.isArray(jsonMetaData.merger)) {
-                jsonMetaData.merger.forEach((mergerData, index) => {
-                    if (mergerData) {
-                        const mergerQuery = `
-                            INSERT INTO submission_merger (adsh, merger_sequence, merger_data)
-                            VALUES (?, ?, ?)
-                            ON DUPLICATE KEY UPDATE 
-                                merger_sequence = VALUES(merger_sequence),
-                                merger_data = VALUES(merger_data)
-                        `;
-                        // Store complex merger data as JSON string
-                        const mergerJson = JSON.stringify(mergerData);
-                        dbPromises.push(common.runQuery('POC', mergerQuery, [adsh, index, mergerJson]));
+            // Process merger data from series_and_classes_contracts_data (N-14 forms)
+            // Must be done sequentially: mergers -> series -> class_contracts (due to foreign keys)
+            if (jsonMetaData.series_and_classes_contracts_data?.merger_series_and_classes_contracts?.merger) {
+                const mergers = jsonMetaData.series_and_classes_contracts_data.merger_series_and_classes_contracts.merger;
+                
+                // Store query parameters (not promises) to delay execution
+                const mergerQueries = [];
+                const seriesQueries = [];
+                const classQueries = [];
+                
+                mergers.forEach((merger, mergerIndex) => {
+                    // Collect merger query parameters
+                    mergerQueries.push({
+                        query: `INSERT INTO submission_merger (adsh, merger_sequence)
+                                VALUES (?, ?)
+                                ON DUPLICATE KEY UPDATE merger_sequence = VALUES(merger_sequence)`,
+                        params: [adsh, mergerIndex]
+                    });
+                    
+                    // Process acquiring_data (series_type = 'A')
+                    if (merger.acquiring_data?.cik && merger.acquiring_data?.series) {
+                        const acquiringCik = merger.acquiring_data.cik;
+                        
+                        merger.acquiring_data.series.forEach((series, seriesIndex) => {
+                            if (series.series_id && series.series_name) {
+                                const seriesIdInt = common.extractIntId(series.series_id);
+                                
+                                // Collect series query parameters
+                                seriesQueries.push({
+                                    query: `INSERT INTO submission_merger_series 
+                                            (adsh, merger_sequence, series_type, entity_cik, entity_sequence, series_id, series_name, series_sequence)
+                                            VALUES (?, ?, 'A', ?, 0, ?, ?, ?)
+                                            ON DUPLICATE KEY UPDATE 
+                                                series_name = VALUES(series_name),
+                                                series_sequence = VALUES(series_sequence)`,
+                                    params: [adsh, mergerIndex, acquiringCik, seriesIdInt, series.series_name, seriesIndex]
+                                });
+                                
+                                // Collect class contract query parameters
+                                if (series.class_contract && Array.isArray(series.class_contract)) {
+                                    series.class_contract.forEach((classContract, classIndex) => {
+                                        if (classContract.class_contract_id && classContract.class_contract_name) {
+                                            const classIdInt = common.extractIntId(classContract.class_contract_id);
+                                            
+                                            classQueries.push({
+                                                query: `INSERT INTO submission_merger_class_contract 
+                                                        (adsh, merger_sequence, series_type, entity_cik, entity_sequence, series_id, class_contract_id, 
+                                                         class_contract_name, class_contract_ticker_symbol, class_sequence)
+                                                        VALUES (?, ?, 'A', ?, 0, ?, ?, ?, ?, ?)
+                                                        ON DUPLICATE KEY UPDATE 
+                                                            class_contract_name = VALUES(class_contract_name),
+                                                            class_contract_ticker_symbol = VALUES(class_contract_ticker_symbol),
+                                                            class_sequence = VALUES(class_sequence)`,
+                                                params: [adsh, mergerIndex, acquiringCik, seriesIdInt, classIdInt, 
+                                                         classContract.class_contract_name, classContract.class_contract_ticker_symbol || null, classIndex]
+                                            });
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                    }
+                    
+                    // Process target_data (series_type = 'T')
+                    if (merger.target_data && Array.isArray(merger.target_data)) {
+                        merger.target_data.forEach((target, targetIndex) => {
+                            if (target.cik) {
+                                const targetCik = target.cik;
+                                
+                                // Check if target has series data
+                                if (target.series && Array.isArray(target.series) && target.series.length > 0) {
+                                    // Target has series data - process normally
+                                    target.series.forEach((series, seriesIndex) => {
+                                        if (series.series_id && series.series_name) {
+                                            const seriesIdInt = common.extractIntId(series.series_id);
+                                            
+                                            // Collect series query parameters
+                                            seriesQueries.push({
+                                                query: `INSERT INTO submission_merger_series 
+                                                        (adsh, merger_sequence, series_type, entity_cik, entity_sequence, series_id, series_name, series_sequence)
+                                                        VALUES (?, ?, 'T', ?, ?, ?, ?, ?)
+                                                        ON DUPLICATE KEY UPDATE 
+                                                            series_name = VALUES(series_name),
+                                                            series_sequence = VALUES(series_sequence)`,
+                                                params: [adsh, mergerIndex, targetCik, targetIndex, seriesIdInt, series.series_name, seriesIndex]
+                                            });
+                                            
+                                            // Collect class contract query parameters
+                                            if (series.class_contract && Array.isArray(series.class_contract)) {
+                                                series.class_contract.forEach((classContract, classIndex) => {
+                                                    if (classContract.class_contract_id && classContract.class_contract_name) {
+                                                        const classIdInt = common.extractIntId(classContract.class_contract_id);
+                                                        
+                                                        classQueries.push({
+                                                            query: `INSERT INTO submission_merger_class_contract 
+                                                                    (adsh, merger_sequence, series_type, entity_cik, entity_sequence, series_id, class_contract_id, 
+                                                                     class_contract_name, class_contract_ticker_symbol, class_sequence)
+                                                                    VALUES (?, ?, 'T', ?, ?, ?, ?, ?, ?, ?)
+                                                                    ON DUPLICATE KEY UPDATE 
+                                                                        class_contract_name = VALUES(class_contract_name),
+                                                                        class_contract_ticker_symbol = VALUES(class_contract_ticker_symbol),
+                                                                        class_sequence = VALUES(class_sequence)`,
+                                                            params: [adsh, mergerIndex, targetCik, targetIndex, seriesIdInt, classIdInt, 
+                                                                     classContract.class_contract_name, classContract.class_contract_ticker_symbol || null, classIndex]
+                                                        });
+                                                    }
+                                                });
+                                            }
+                                        }
+                                    });
+                                } else {
+                                    // Target has CIK only, no series data - use series_id = NULL
+                                    seriesQueries.push({
+                                        query: `INSERT INTO submission_merger_series 
+                                                (adsh, merger_sequence, series_type, entity_cik, entity_sequence, series_id, series_name, series_sequence)
+                                                VALUES (?, ?, 'T', ?, ?, NULL, '', 0)
+                                                ON DUPLICATE KEY UPDATE 
+                                                    series_name = VALUES(series_name),
+                                                    series_sequence = VALUES(series_sequence)`,
+                                        params: [adsh, mergerIndex, targetCik, targetIndex]
+                                    });
+                                }
+                            }
+                        });
                     }
                 });
-            }
-
-            // Process target_data
-            if (jsonMetaData.target_data && Array.isArray(jsonMetaData.target_data)) {
-                jsonMetaData.target_data.forEach((targetData, index) => {
-                    if (targetData) {
-                        const targetQuery = `
-                            INSERT INTO submission_target_data (adsh, target_sequence, target_data)
-                            VALUES (?, ?, ?)
-                            ON DUPLICATE KEY UPDATE 
-                                target_sequence = VALUES(target_sequence),
-                                target_data = VALUES(target_data)
-                        `;
-                        // Store complex target data as JSON string
-                        const targetJson = JSON.stringify(targetData);
-                        dbPromises.push(common.runQuery('POC', targetQuery, [adsh, index, targetJson]));
-                    }
-                });
+                
+                // Execute in proper order with delayed promise creation
+                // This ensures foreign key constraints are satisfied
+                const mergerPromise = (async () => {
+                    // Stage 1: Execute all merger inserts
+                    await Promise.all(mergerQueries.map(q => common.runQuery('POC', q.query, q.params)));
+                    
+                    // Stage 2: Execute all series inserts (only after mergers complete)
+                    await Promise.all(seriesQueries.map(q => common.runQuery('POC', q.query, q.params)));
+                    
+                    // Stage 3: Execute all class contract inserts (only after series complete)
+                    await Promise.all(classQueries.map(q => common.runQuery('POC', q.query, q.params)));
+                })();
+                
+                dbPromises.push(mergerPromise);
             }
 
             // Process rule data (for SD and other forms)

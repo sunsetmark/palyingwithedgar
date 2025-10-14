@@ -677,6 +677,8 @@ DROP TABLE IF EXISTS submission_former_name;
 DROP TABLE IF EXISTS submission_document;
 DROP TABLE IF EXISTS submission_class_contract;  --class_constract before series
 DROP TABLE IF EXISTS submission_series;
+DROP TABLE IF EXISTS submission_merger_class_contract;
+DROP TABLE IF EXISTS submission_merger_series;
 DROP TABLE IF EXISTS submission_item;
 DROP TABLE IF EXISTS submission_references_429;
 DROP TABLE IF EXISTS submission_group_members;
@@ -778,7 +780,6 @@ CREATE TABLE submission_entity (
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (adsh, filer_code, entity_sequence),
-    UNIQUE INDEX idx_adsh_cik_filer (adsh, cik, filer_code),
     INDEX idx_cik (cik),
     FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE,
     FOREIGN KEY (filer_code) REFERENCES filer_type_ref(filer_code)
@@ -890,12 +891,11 @@ CREATE TABLE submission_group_members (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------
--- submission_merger: Merger data
+-- submission_merger: Merger tracking (for N-14 forms)
 -- ----------------------------------------------------------------------------
 CREATE TABLE submission_merger (
     adsh VARCHAR(20) NOT NULL,
-    merger_sequence SMALLINT UNSIGNED NOT NULL COMMENT 'Preserves array order from original filing',
-    merger_data TEXT NOT NULL COMMENT 'JSON or text data for merger information',
+    merger_sequence SMALLINT UNSIGNED NOT NULL COMMENT 'Index in merger array (0-based)',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (adsh, merger_sequence),
@@ -903,17 +903,46 @@ CREATE TABLE submission_merger (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------
--- submission_target_data: Target data
+-- submission_merger_series: Series in mergers (both acquiring and target)
 -- ----------------------------------------------------------------------------
-
-CREATE TABLE submission_target_data (
+CREATE TABLE submission_merger_series (
     adsh VARCHAR(20) NOT NULL,
-    target_sequence SMALLINT UNSIGNED NOT NULL COMMENT 'Preserves array order from original filing',
-    target_data TEXT NOT NULL COMMENT 'JSON or text data for target information',
+    merger_sequence SMALLINT UNSIGNED NOT NULL,
+    series_type CHAR(1) NOT NULL COMMENT 'A=Acquiring, T=Target',
+    entity_cik BIGINT UNSIGNED NOT NULL COMMENT 'CIK of the entity owning this series',
+    entity_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Order in target_data array (0 for acquiring)',
+    series_id INT UNSIGNED NULL COMMENT 'Series ID as integer (NULL for CIK-only targets)',
+    series_name VARCHAR(255) NOT NULL DEFAULT '' COMMENT 'Empty string for CIK-only targets',
+    series_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Order in series array',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (adsh, target_sequence),
-    FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE
+    PRIMARY KEY (adsh, merger_sequence, series_type, entity_cik, entity_sequence),
+    INDEX idx_merger_series_type (series_type),
+    INDEX idx_merger_entity_cik (entity_cik),
+    INDEX idx_merger_series_id (series_id),
+    FOREIGN KEY (adsh, merger_sequence) REFERENCES submission_merger(adsh, merger_sequence) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------------------------
+-- submission_merger_class_contract: Class contracts in merger series
+-- ----------------------------------------------------------------------------
+CREATE TABLE submission_merger_class_contract (
+    adsh VARCHAR(20) NOT NULL,
+    merger_sequence SMALLINT UNSIGNED NOT NULL,
+    series_type CHAR(1) NOT NULL COMMENT 'A=Acquiring, T=Target',
+    entity_cik BIGINT UNSIGNED NOT NULL,
+    entity_sequence SMALLINT UNSIGNED NOT NULL COMMENT 'References parent entity_sequence',
+    series_id INT UNSIGNED NOT NULL COMMENT 'Series ID (class contracts always belong to a series)',
+    class_contract_id INT UNSIGNED NOT NULL COMMENT 'Class contract ID as integer',
+    class_contract_name VARCHAR(255) NOT NULL,
+    class_contract_ticker_symbol VARCHAR(20) DEFAULT NULL,
+    class_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Order in class_contract array',
+    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (adsh, merger_sequence, series_type, entity_cik, entity_sequence, series_id, class_contract_id),
+    INDEX idx_merger_class_id (class_contract_id),
+    FOREIGN KEY (adsh, merger_sequence, series_type, entity_cik, entity_sequence) 
+        REFERENCES submission_merger_series(adsh, merger_sequence, series_type, entity_cik, entity_sequence) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------
