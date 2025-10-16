@@ -583,7 +583,7 @@ export const fetchSubmissionMetadata = async function(adsh) {
         
         // Query series and classes
         const seriesRows = await runQuery('POC',
-            'SELECT * FROM submission_series WHERE adsh = ? ORDER BY owner_cik, series_id', [adsh]);
+            'SELECT * FROM submission_series WHERE adsh = ? ORDER BY series_source, owner_cik, series_id, series_sequence', [adsh]);
         
         if (seriesRows && seriesRows.length > 0) {
             const newSeries = [];
@@ -601,10 +601,12 @@ export const fetchSubmissionMetadata = async function(adsh) {
                 // Format owner_cik with leading zeros
                 const ownerCikFormatted = seriesRow.owner_cik ? seriesRow.owner_cik.toString().padStart(10, '0') : null;
                 
-                // Query class contracts for this series
+                // Query class contracts for this series (matching series_source and series_sequence)
                 const classRows = await runQuery('POC',
-                    'SELECT * FROM submission_class_contract WHERE adsh = ? AND series_id = ? order by class_contract_id',
-                    [adsh, seriesRow.series_id]);
+                    `SELECT * FROM submission_class_contract 
+                     WHERE adsh = ? AND series_source = ? AND series_id = ? AND series_sequence = ? 
+                     ORDER BY class_sequence`,
+                    [adsh, seriesRow.series_source, seriesRow.series_id, seriesRow.series_sequence]);
                 
                 if (classRows && classRows.length > 0) {
                     series.class_contract = classRows.map(cc => {
@@ -648,24 +650,27 @@ export const fetchSubmissionMetadata = async function(adsh) {
                     };
                 }
                 
-                if (newSeries.length > 0) {
-                    const newContract = {
-                        new_series: newSeries
-                    };
-                    if (ownerCikForNew) {
-                        newContract.owner_cik = ownerCikForNew;
+                // Handle new_series_and_classes_contracts - can contain both new_series and new_classes_contracts
+                if (newSeries.length > 0 || newClassesContracts.length > 0) {
+                    const newContract = {};
+                    
+                    // Add owner_cik if present (use from newSeries first, then newClassesContracts)
+                    const ownerCik = ownerCikForNew || ownerCikForNewClasses;
+                    if (ownerCik) {
+                        newContract.owner_cik = ownerCik;
                     }
+                    
+                    // Add new_series if present
+                    if (newSeries.length > 0) {
+                        newContract.new_series = newSeries;
+                    }
+                    
+                    // Add new_classes_contracts if present
+                    if (newClassesContracts.length > 0) {
+                        newContract.new_classes_contracts = newClassesContracts;
+                    }
+                    
                     submission.series_and_classes_contracts_data.new_series_and_classes_contracts = newContract;
-                }
-                
-                if (newClassesContracts.length > 0) {
-                    const newClassesContract = {
-                        new_classes_contracts: newClassesContracts
-                    };
-                    if (ownerCikForNewClasses) {
-                        newClassesContract.owner_cik = ownerCikForNewClasses;
-                    }
-                    submission.series_and_classes_contracts_data.new_series_and_classes_contracts = newClassesContract;
                 }
             }
         }
@@ -697,8 +702,9 @@ export const fetchSubmissionMetadata = async function(adsh) {
         }
         
         // Query merger data (N-14 forms)
+        // Get distinct merger_sequence values from submission_merger_series
         const mergerRows = await runQuery('POC',
-            'SELECT merger_sequence FROM submission_merger WHERE adsh = ? ORDER BY merger_sequence', 
+            'SELECT DISTINCT merger_sequence FROM submission_merger_series WHERE adsh = ? ORDER BY merger_sequence', 
             [adsh]);
         
         if (mergerRows && mergerRows.length > 0) {
@@ -730,9 +736,9 @@ export const fetchSubmissionMetadata = async function(adsh) {
                         const classRows = await runQuery('POC',
                             `SELECT * FROM submission_merger_class_contract 
                              WHERE adsh = ? AND merger_sequence = ? AND series_type = 'A' 
-                             AND entity_cik = ? AND series_id = ?
+                             AND entity_cik = ? AND entity_sequence = ? AND series_id = ? AND series_sequence = ?
                              ORDER BY class_sequence`,
-                            [adsh, mergerSequence, seriesRow.entity_cik, seriesRow.series_id]);
+                            [adsh, mergerSequence, seriesRow.entity_cik, seriesRow.entity_sequence, seriesRow.series_id, seriesRow.series_sequence]);
                         
                         if (classRows && classRows.length > 0) {
                             series.class_contract = classRows.map(cc => {
@@ -793,9 +799,9 @@ export const fetchSubmissionMetadata = async function(adsh) {
                         const classRows = await runQuery('POC',
                             `SELECT * FROM submission_merger_class_contract 
                              WHERE adsh = ? AND merger_sequence = ? AND series_type = 'T' 
-                             AND entity_cik = ? AND entity_sequence = ? AND series_id = ?
+                             AND entity_cik = ? AND entity_sequence = ? AND series_id = ? AND series_sequence = ?
                              ORDER BY class_sequence`,
-                            [adsh, mergerSequence, seriesRow.entity_cik, seriesRow.entity_sequence, seriesRow.series_id]);
+                            [adsh, mergerSequence, seriesRow.entity_cik, seriesRow.entity_sequence, seriesRow.series_id, seriesRow.series_sequence]);
                         
                         if (classRows && classRows.length > 0) {
                             series.class_contract = classRows.map(cc => {
@@ -881,24 +887,22 @@ export const validateXML = async (xmlS3Source, xsdS3Sources) => {
     const tempFiles = [];
     
     try {
+        const startTime = Date.now();
         // Create a temporary directory for our files
         tempDir = await mkdtemp(join(tmpdir(), 'xml-validation-'));
         
         // Download XML file from S3 to temp directory (using stream for large files)
-        const xmlTempPath = join(tempDir, 'input.xml');
-        const xmlStream = await s3ReadStream(xmlS3Source.bucket, xmlS3Source.key);
-        const xmlWriteStream = createWriteStream(xmlTempPath);
-        await pipeline(xmlStream, xmlWriteStream);
-        tempFiles.push(xmlTempPath);
+
+        const xmlPromise = s3ReadString(xmlS3Source.bucket, xmlS3Source.key); 
         
         // Download all XSD files to temp directory (they're smaller, so we can use strings)
+        const { writeFile } = await import('fs/promises');
         const xsdPaths = [];
+        const xsdFilePromises = [];
         for (const xsdSource of xsdS3Sources) {
             const xsdFileName = xsdSource.key.split('/').pop();
-            const xsdTempPath = join(tempDir, xsdFileName);
-            const xsdContent = await s3ReadString(xsdSource.bucket, xsdSource.key);
-            const { writeFile } = await import('fs/promises');
-            await writeFile(xsdTempPath, xsdContent);
+            const xsdTempPath = join(tempDir, xsdFileName); //console.debug('xsdTempPath', xsdTempPath);
+            xsdFilePromises.push(writeFile(xsdTempPath, await s3ReadString(xsdSource.bucket, xsdSource.key)));
             tempFiles.push(xsdTempPath);
             xsdPaths.push({
                 path: xsdTempPath,
@@ -906,11 +910,12 @@ export const validateXML = async (xmlS3Source, xsdS3Sources) => {
                 run: xsdSource.run !== false // Default to true if not specified
             });
         }
+        await Promise.all(xsdFilePromises);
         
         // Read the XML file into memory
         // Note: For very large files (2GB), validate-with-xmllint pipes content to xmllint's stdin,
         // so it doesn't load the entire file into memory during validation
-        const xmlContent = await fsReadFile(xmlTempPath, 'utf-8');
+        const xmlContent = await xmlPromise;
         
         // Validate against each XSD where run=true
         const validationDetails = [];
@@ -918,6 +923,7 @@ export const validateXML = async (xmlS3Source, xsdS3Sources) => {
         let totalErrors = 0;
         let overallValid = true;
         
+        //console.log(`loaded files in ${Date.now()-startTime}ms`);
         for (const xsdInfo of xsdPaths) {
             if (!xsdInfo.run) continue;
             
@@ -971,7 +977,6 @@ export const validateXML = async (xmlS3Source, xsdS3Sources) => {
                 errors: errors
             });
         }
-        
         return {
             validated: overallValid,
             warningCount: totalWarnings,

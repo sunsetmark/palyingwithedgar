@@ -106,7 +106,7 @@ if (shouldRunTest(6)) {
     
     for (const subfolder of subfolders) {
         if (!subfolder.isDirectory()) continue;
-        if (filesProcessed >= 100000) break;
+        if (filesProcessed >= 1000000) break;
         
         const subfolderPath = join(filingsDir, subfolder.name);
         const files = await readdir(subfolderPath);
@@ -180,6 +180,7 @@ if (shouldRunTest(7)) {
     const sourceKeys = ['samples/form3/form3-10142025_021044.xml', 'samples/form3/form3-badState.xml', 'samples/form3/form3-badTag.xml'];
     for(var i = 0; i < sourceKeys.length; i++) {
         try {
+            const startForm3 = Date.now();
             const validationResult = await common.validateXML(
                 { "bucket": "test.publicdata.guru", "key": sourceKeys[i] },
                 [
@@ -187,14 +188,36 @@ if (shouldRunTest(7)) {
                     { "bucket": "test.publicdata.guru", "key": "xsd/ownershipDocumentCommon.xsd.xml", "run": false }
                 ]
             );
-            console.log(`Validation Result for ${sourceKeys[i]}:`);
+            console.log(`Validation Result for ${sourceKeys[i]} in ${Date.now()-startForm3}ms:`);
             console.log(JSON.stringify(validationResult, null, 2));
             console.log('Status: OK (no error thrown)\n');
         } catch (error) {
             console.log(`Status: ERROR - ${error.message}\n`);
         }
     }
+    try {
+        const bigNport = { "bucket": "test.publicdata.guru", "key": "samples/NPORT/0001145549-24-003877_355MB/primary_doc.corrected.xml" };
+        const startNPort = Date.now();
+        const validationResult = await common.validateXML(bigNport,
+            [  //note sure if "eis_stateCodes.xsd" is needed
+                { "bucket": "test.publicdata.guru", "key": "xsd/eis_Common.xsd", "run": false },
+                { "bucket": "test.publicdata.guru", "key": "xsd/eis_ISO_StateCodes.xsd", "run": false },
+                { "bucket": "test.publicdata.guru", "key": "xsd/eis_NPORT_common.xsd", "run": false },
+                { "bucket": "test.publicdata.guru", "key": "xsd/eis_stateCodes.xsd", "run": false },
+                { "bucket": "test.publicdata.guru", "key": "xsd/eis_NPORT_Filer.xsd", "run": true },
+            ]
+        );
+        console.log(`Validation Result for ${bigNport.key} in ${Date.now() - startNPort}ms:`);
+        console.log(JSON.stringify(validationResult, null, 2));
+        console.log('Status: OK (no error thrown)\n');
+    } catch (error) {
+        console.log(`Status: ERROR - ${error.message}\n`);
+    }
 }
+
+
+
+
 
 /**
  * Clean metadata from file to match what's stored in DB

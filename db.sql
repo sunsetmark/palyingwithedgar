@@ -682,7 +682,6 @@ DROP TABLE IF EXISTS submission_merger_series;
 DROP TABLE IF EXISTS submission_item;
 DROP TABLE IF EXISTS submission_references_429;
 DROP TABLE IF EXISTS submission_group_members;
-DROP TABLE IF EXISTS submission_merger;
 DROP TABLE IF EXISTS submission_rule_item;  --drop first due to foreign key constraint
 DROP TABLE IF EXISTS submission_rule;
 DROP TABLE IF EXISTS submission_target_data;
@@ -826,9 +825,10 @@ CREATE TABLE submission_series (
     owner_cik BIGINT UNSIGNED NOT NULL,
     series_name VARCHAR(255) NOT NULL,
     series_source ENUM('new_series', 'new_classes_contracts', 'existing_series') NOT NULL DEFAULT 'new_series' COMMENT 'Source property name from original filing',
+    series_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Sequence within series_source group - allows same series_id in multiple groups',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (adsh, series_id),
+    PRIMARY KEY (adsh, series_source, series_id, series_sequence),
     INDEX idx_owner_cik (owner_cik),
     INDEX idx_series_id (series_id),
     FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE
@@ -839,15 +839,19 @@ CREATE TABLE submission_series (
 -- ----------------------------------------------------------------------------
 CREATE TABLE submission_class_contract (
     adsh VARCHAR(20) NOT NULL,
+    series_source ENUM('new_series', 'new_classes_contracts', 'existing_series') NOT NULL COMMENT 'Must match parent series_source',
     series_id INT UNSIGNED NOT NULL,
+    series_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Must match parent series_sequence',
     class_contract_id INT UNSIGNED NOT NULL COMMENT 'Class contract ID as bigint',
     class_contract_name VARCHAR(255) NOT NULL,
     class_contract_ticker_symbol VARCHAR(20) DEFAULT NULL,
+    class_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Order within the class_contract array',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (adsh, series_id, class_contract_id),
+    PRIMARY KEY (adsh, series_source, series_id, series_sequence, class_contract_id),
     INDEX idx_class_contract_id (class_contract_id),
-    FOREIGN KEY (adsh, series_id) REFERENCES submission_series(adsh, series_id) ON DELETE CASCADE
+    FOREIGN KEY (adsh, series_source, series_id, series_sequence) 
+        REFERENCES submission_series(adsh, series_source, series_id, series_sequence) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------
@@ -890,23 +894,12 @@ CREATE TABLE submission_group_members (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------
--- submission_merger: Merger tracking (for N-14 forms)
--- ----------------------------------------------------------------------------
-CREATE TABLE submission_merger (
-    adsh VARCHAR(20) NOT NULL,
-    merger_sequence SMALLINT UNSIGNED NOT NULL COMMENT 'Index in merger array (0-based)',
-    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (adsh, merger_sequence),
-    FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ----------------------------------------------------------------------------
 -- submission_merger_series: Series in mergers (both acquiring and target)
+-- Note: No separate submission_merger table needed - merger_sequence tracked here directly
 -- ----------------------------------------------------------------------------
 CREATE TABLE submission_merger_series (
     adsh VARCHAR(20) NOT NULL,
-    merger_sequence SMALLINT UNSIGNED NOT NULL,
+    merger_sequence SMALLINT UNSIGNED NOT NULL COMMENT 'Index in merger array (0-based)',
     series_type CHAR(1) NOT NULL COMMENT 'A=Acquiring, T=Target',
     entity_cik BIGINT UNSIGNED NOT NULL COMMENT 'CIK of the entity owning this series',
     entity_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Order in target_data array (0 for acquiring)',
@@ -915,11 +908,11 @@ CREATE TABLE submission_merger_series (
     series_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Order in series array',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (adsh, merger_sequence, series_type, entity_cik, entity_sequence),
+    PRIMARY KEY (adsh, merger_sequence, series_type, entity_cik, entity_sequence, series_sequence),
     INDEX idx_merger_series_type (series_type),
     INDEX idx_merger_entity_cik (entity_cik),
     INDEX idx_merger_series_id (series_id),
-    FOREIGN KEY (adsh, merger_sequence) REFERENCES submission_merger(adsh, merger_sequence) ON DELETE CASCADE
+    FOREIGN KEY (adsh) REFERENCES submission(adsh) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------
@@ -932,16 +925,17 @@ CREATE TABLE submission_merger_class_contract (
     entity_cik BIGINT UNSIGNED NOT NULL,
     entity_sequence SMALLINT UNSIGNED NOT NULL COMMENT 'References parent entity_sequence',
     series_id INT UNSIGNED NOT NULL COMMENT 'Series ID (class contracts always belong to a series)',
+    series_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'References parent series_sequence',
     class_contract_id INT UNSIGNED NOT NULL COMMENT 'Class contract ID as integer',
     class_contract_name VARCHAR(255) NOT NULL,
     class_contract_ticker_symbol VARCHAR(20) DEFAULT NULL,
     class_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Order in class_contract array',
     created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (adsh, merger_sequence, series_type, entity_cik, entity_sequence, series_id, class_contract_id),
+    PRIMARY KEY (adsh, merger_sequence, series_type, entity_cik, entity_sequence, series_sequence, series_id, class_contract_id),
     INDEX idx_merger_class_id (class_contract_id),
-    FOREIGN KEY (adsh, merger_sequence, series_type, entity_cik, entity_sequence) 
-        REFERENCES submission_merger_series(adsh, merger_sequence, series_type, entity_cik, entity_sequence) ON DELETE CASCADE
+    FOREIGN KEY (adsh, merger_sequence, series_type, entity_cik, entity_sequence, series_sequence) 
+        REFERENCES submission_merger_series(adsh, merger_sequence, series_type, entity_cik, entity_sequence, series_sequence) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------------------------------------------------------
@@ -978,7 +972,7 @@ CREATE TABLE submission_rule_item (
 -- ALTER TABLE submission_former_name ADD COLUMN former_name_sequence INT NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing' AFTER date_changed;
 -- ALTER TABLE submission_references_429 ADD COLUMN reference_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing' AFTER reference_429;
 -- ALTER TABLE submission_group_members ADD COLUMN group_member_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing' AFTER group_member;
--- ALTER TABLE submission_merger ADD COLUMN merger_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing' AFTER adsh;
+-- Note: submission_merger table removed - merger_sequence now tracked directly in submission_merger_series
 -- ALTER TABLE submission_target_data ADD COLUMN target_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing' AFTER adsh;
 
 -- Drop item_sequence column if it exists (items are naturally ordered by item_code)

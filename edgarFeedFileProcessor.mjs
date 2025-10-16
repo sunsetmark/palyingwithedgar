@@ -359,20 +359,8 @@ export async function processFeedFile(processInfo) {
                 });
             }
 
-            // Process series and classes from series_and_classes_contracts_data
-            if (jsonMetaData.series_and_classes_contracts_data){
-                let seriesData = jsonMetaData.series_and_classes_contracts_data;
-                if(seriesData.existing_series_and_classes_contracts 
-                    && seriesData.existing_series_and_classes_contracts.series 
-                    && Array.isArray(seriesData.existing_series_and_classes_contracts.series)) 
-                        processSeriesAndClasses(seriesData.existing_series_and_classes_contracts.series, 0, seriesData.existing_series_and_classes_contracts.owner_cik);
-                if (seriesData.new_series_and_classes_contracts 
-                    && seriesData.new_series_and_classes_contracts.new_series 
-                    && Array.isArray(seriesData.new_series_and_classes_contracts.new_series)) 
-                        processSeriesAndClasses(seriesData.new_series_and_classes_contracts.new_series, 1, seriesData.new_series_and_classes_contracts.owner_cik);
-            }
-            //END:  PROCESS SERIES AND CLASSES ASSOCIATED WITH SUBMISSION 
-            
+            // Note: Series processing has been moved to after writeSubmissionHeaderRecords (around line 688)
+            // to properly handle new_series, new_classes_contracts, and existing_series with sequence fields
             
             //START:  PROCESS DOCUMENTS METADATA
             if (jsonMetaData.document && Array.isArray(jsonMetaData.document)) {
@@ -691,43 +679,46 @@ export async function processFeedFile(processInfo) {
                 const processSeries = (seriesArray, globalOwnerCik, seriesSource) => {
                     if (!seriesArray || !Array.isArray(seriesArray)) return;
                     
-                    seriesArray.forEach(series => {
+                    seriesArray.forEach((series, seriesIndex) => {
                         if (series.series_id && series.series_name) {
                             const seriesIdBigint = common.extractIntId(series.series_id);
                             const ownerCik = globalOwnerCik || series.owner_cik;
                             
                             const seriesQuery = `
-                                INSERT INTO submission_series (adsh, series_id, owner_cik, series_name, series_source)
-                                VALUES (?, ?, ?, ?, ?)
+                                INSERT INTO submission_series (adsh, series_id, owner_cik, series_name, series_source, series_sequence)
+                                VALUES (?, ?, ?, ?, ?, ?)
                                 ON DUPLICATE KEY UPDATE
                                     owner_cik = VALUES(owner_cik),
                                     series_name = VALUES(series_name),
-                                    series_source = VALUES(series_source)
+                                    series_source = VALUES(series_source),
+                                    series_sequence = VALUES(series_sequence)
                             `;
                             
                             // Insert series first, then insert class contracts
                             const seriesPromise = common.runQuery('POC', seriesQuery, [
-                                adsh, seriesIdBigint, ownerCik, series.series_name, seriesSource
+                                adsh, seriesIdBigint, ownerCik, series.series_name, seriesSource, seriesIndex
                             ]).then(() => {
                                 // Process class contracts after series is inserted
                                 if (series.class_contract && Array.isArray(series.class_contract)) {
-                                    series.class_contract.forEach(classContract => {
+                                    series.class_contract.forEach((classContract, classIndex) => {
                                         if (classContract.class_contract_id && classContract.class_contract_name) {
                                             const classIdBigint = common.extractIntId(classContract.class_contract_id);
                                             
                                             const classQuery = `
                                                 INSERT INTO submission_class_contract (
-                                                    adsh, series_id, class_contract_id, class_contract_name,
-                                                    class_contract_ticker_symbol
-                                                ) VALUES (?, ?, ?, ?, ?)
+                                                    adsh, series_source, series_id, series_sequence, class_contract_id, 
+                                                    class_contract_name, class_contract_ticker_symbol, class_sequence
+                                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                                                 ON DUPLICATE KEY UPDATE
                                                     class_contract_name = VALUES(class_contract_name),
-                                                    class_contract_ticker_symbol = VALUES(class_contract_ticker_symbol)
+                                                    class_contract_ticker_symbol = VALUES(class_contract_ticker_symbol),
+                                                    class_sequence = VALUES(class_sequence)
                                             `;
                                             dbPromises.push(common.runQuery('POC', classQuery, [
-                                                adsh, seriesIdBigint, classIdBigint,
+                                                adsh, seriesSource, seriesIdBigint, seriesIndex, classIdBigint,
                                                 classContract.class_contract_name,
-                                                classContract.class_contract_ticker_symbol || null
+                                                classContract.class_contract_ticker_symbol || null,
+                                                classIndex
                                             ]));
                                         }
                                     });
@@ -831,19 +822,10 @@ export async function processFeedFile(processInfo) {
                 const mergers = jsonMetaData.series_and_classes_contracts_data.merger_series_and_classes_contracts.merger;
                 
                 // Store query parameters (not promises) to delay execution
-                const mergerQueries = [];
                 const seriesQueries = [];
                 const classQueries = [];
                 
                 mergers.forEach((merger, mergerIndex) => {
-                    // Collect merger query parameters
-                    mergerQueries.push({
-                        query: `INSERT INTO submission_merger (adsh, merger_sequence)
-                                VALUES (?, ?)
-                                ON DUPLICATE KEY UPDATE merger_sequence = VALUES(merger_sequence)`,
-                        params: [adsh, mergerIndex]
-                    });
-                    
                     // Process acquiring_data (series_type = 'A')
                     if (merger.acquiring_data?.cik && merger.acquiring_data?.series) {
                         const acquiringCik = merger.acquiring_data.cik;
@@ -871,14 +853,14 @@ export async function processFeedFile(processInfo) {
                                             
                                             classQueries.push({
                                                 query: `INSERT INTO submission_merger_class_contract 
-                                                        (adsh, merger_sequence, series_type, entity_cik, entity_sequence, series_id, class_contract_id, 
-                                                         class_contract_name, class_contract_ticker_symbol, class_sequence)
-                                                        VALUES (?, ?, 'A', ?, 0, ?, ?, ?, ?, ?)
+                                                        (adsh, merger_sequence, series_type, entity_cik, entity_sequence, series_id, series_sequence,
+                                                         class_contract_id, class_contract_name, class_contract_ticker_symbol, class_sequence)
+                                                        VALUES (?, ?, 'A', ?, 0, ?, ?, ?, ?, ?, ?)
                                                         ON DUPLICATE KEY UPDATE 
                                                             class_contract_name = VALUES(class_contract_name),
                                                             class_contract_ticker_symbol = VALUES(class_contract_ticker_symbol),
                                                             class_sequence = VALUES(class_sequence)`,
-                                                params: [adsh, mergerIndex, acquiringCik, seriesIdInt, classIdInt, 
+                                                params: [adsh, mergerIndex, acquiringCik, seriesIdInt, seriesIndex, classIdInt, 
                                                          classContract.class_contract_name, classContract.class_contract_ticker_symbol || null, classIndex]
                                             });
                                         }
@@ -920,14 +902,14 @@ export async function processFeedFile(processInfo) {
                                                         
                                                         classQueries.push({
                                                             query: `INSERT INTO submission_merger_class_contract 
-                                                                    (adsh, merger_sequence, series_type, entity_cik, entity_sequence, series_id, class_contract_id, 
-                                                                     class_contract_name, class_contract_ticker_symbol, class_sequence)
-                                                                    VALUES (?, ?, 'T', ?, ?, ?, ?, ?, ?, ?)
+                                                                    (adsh, merger_sequence, series_type, entity_cik, entity_sequence, series_id, series_sequence,
+                                                                     class_contract_id, class_contract_name, class_contract_ticker_symbol, class_sequence)
+                                                                    VALUES (?, ?, 'T', ?, ?, ?, ?, ?, ?, ?, ?)
                                                                     ON DUPLICATE KEY UPDATE 
                                                                         class_contract_name = VALUES(class_contract_name),
                                                                         class_contract_ticker_symbol = VALUES(class_contract_ticker_symbol),
                                                                         class_sequence = VALUES(class_sequence)`,
-                                                            params: [adsh, mergerIndex, targetCik, targetIndex, seriesIdInt, classIdInt, 
+                                                            params: [adsh, mergerIndex, targetCik, targetIndex, seriesIdInt, seriesIndex, classIdInt, 
                                                                      classContract.class_contract_name, classContract.class_contract_ticker_symbol || null, classIndex]
                                                         });
                                                     }
@@ -953,15 +935,13 @@ export async function processFeedFile(processInfo) {
                 });
                 
                 // Execute in proper order with delayed promise creation
-                // This ensures foreign key constraints are satisfied
+                // Execute queries in proper order to satisfy foreign key constraints:
+                // 1. Series records, 2. Class contract records
                 const mergerPromise = (async () => {
-                    // Stage 1: Execute all merger inserts
-                    await Promise.all(mergerQueries.map(q => common.runQuery('POC', q.query, q.params)));
-                    
-                    // Stage 2: Execute all series inserts (only after mergers complete)
+                    // Stage 1: Execute all series inserts
                     await Promise.all(seriesQueries.map(q => common.runQuery('POC', q.query, q.params)));
                     
-                    // Stage 3: Execute all class contract inserts (only after series complete)
+                    // Stage 2: Execute all class contract inserts (only after series complete)
                     await Promise.all(classQueries.map(q => common.runQuery('POC', q.query, q.params)));
                 })();
                 
