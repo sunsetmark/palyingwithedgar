@@ -882,6 +882,68 @@ export const fetchSubmissionMetadata = async function(adsh) {
  * @param {Array} xsdS3Sources - Array of objects with bucket, key, and run properties
  * @returns {Object} Validation results with validated, warningCount, errorCount, and validationDetails
  */
+/**
+ * Extract XBRL instance from iXBRL document using Arelle
+ * @param {string} iXbrlPath - Path to input iXBRL HTML file
+ * @param {string} outputXbrlPath - Path to save extracted XBRL instance
+ * @returns {Object} Result with success status and message
+ */
+export const extractXbrlFromIxbrl = async (iXbrlPath, outputXbrlPath) => {
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+    
+    try {
+        // Use arelleCmdLine with inlineXbrlDocumentSet plugin and saveInstance option
+        // The saveInstance flag saves to <inputfile_basename>_extracted.xbrl
+        const { basename } = await import('path');
+        const inputBasename = basename(iXbrlPath);
+        const inputWithoutExt = inputBasename.replace(/\.[^.]+$/, ''); // remove extension
+        const { dirname } = await import('path');
+        const inputDir = dirname(iXbrlPath);
+        const defaultOutput = `${inputDir}/${inputWithoutExt}_extracted.xbrl`;
+        
+        // Run arelleCmdLine with online mode (needed for schema references)
+        const command = `arelleCmdLine --plugins=inlineXbrlDocumentSet --internetConnectivity online --file "${iXbrlPath}" --saveInstance 2>&1`;
+        const { stdout, stderr } = await execAsync(command);
+        
+        // Check if extraction produced output file
+        const { access } = await import('fs/promises');
+        try {
+            await access(defaultOutput);
+        } catch (accessError) {
+            // File wasn't created - check for errors in output
+            return {
+                success: false,
+                message: `Extraction failed - output file not created at ${defaultOutput}`,
+                stdout,
+                stderr,
+                command
+            };
+        }
+        
+        // Move the extracted file to the desired output path
+        const { rename } = await import('fs/promises');
+        await rename(defaultOutput, outputXbrlPath);
+        
+        return { 
+            success: true, 
+            message: `Successfully extracted XBRL to: ${outputXbrlPath}`,
+            stdout,
+            stderr
+        };
+        
+    } catch (error) {
+        return { 
+            success: false, 
+            message: `Error extracting XBRL: ${error.message}`,
+            error: error.message,
+            stderr: error.stderr,
+            stdout: error.stdout
+        };
+    }
+};
+
 export const validateXML = async (xmlS3Source, xsdS3Sources) => {
     let tempDir = null;
     const tempFiles = [];
@@ -1026,5 +1088,6 @@ export const common = {
     formatAccessionNumber,
     extractIntId,
     fetchSubmissionMetadata,
+    extractXbrlFromIxbrl,
     validateXML
 };

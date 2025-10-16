@@ -215,7 +215,81 @@ if (shouldRunTest(7)) {
     }
 }
 
-
+// Test 8: extractXbrlFromIxbrl
+if (shouldRunTest(8)) {
+    console.log('Test 8: extractXbrlFromIxbrl - Extract XBRL instances from iXBRL documents');
+    
+    const testCases = [
+        {
+            ixbrl: '/home/ec2-user/poc/samples/iXBRL/0001213900-25-099277/ea0261065-s1_pmgchold.htm',
+            output: '/home/ec2-user/poc/samples/iXBRL/0001213900-25-099277/ea0261065-s1_pmgchold.htm.node.xml',
+            secVersion: '/home/ec2-user/poc/samples/iXBRL/0001213900-25-099277/ea0261065-s1_pmgchold_htm.xml'
+        },
+        {
+            ixbrl: '/home/ec2-user/poc/samples/iXBRL/0001213900-25-099277/ea026106501ex-fee_pmgchold.htm',
+            output: '/home/ec2-user/poc/samples/iXBRL/0001213900-25-099277/ea026106501ex-fee_pmgchold.htm.node.xml',
+            secVersion: '/home/ec2-user/poc/samples/iXBRL/0001213900-25-099277/ea026106501ex-fee_pmgchold_htm.xml'
+        }
+    ];
+    
+    for (const testCase of testCases) {
+        try {
+            console.log(`\n  Processing: ${testCase.ixbrl.split('/').pop()}`);
+            
+            // Extract XBRL from iXBRL
+            const result = await common.extractXbrlFromIxbrl(testCase.ixbrl, testCase.output);
+            
+            if (result.success) {
+                console.log(`  ✓ Extraction successful`);
+                
+                // Show file sizes
+                const { stat } = await import('fs/promises');
+                const secStat = await stat(testCase.secVersion);
+                const nodeStat = await stat(testCase.output);
+                console.log(`  File sizes: SEC=${secStat.size} bytes, Node=${nodeStat.size} bytes`);
+                
+                // Run diff against SEC's version
+                const { exec } = await import('child_process');
+                const { promisify } = await import('util');
+                const execAsync = promisify(exec);
+                
+                try {
+                    // Use wc to count differences
+                    const { stdout: diffStats } = await execAsync(`diff ${testCase.secVersion} ${testCase.output} | wc -l`);
+                    const diffLineCount = parseInt(diffStats.trim());
+                    
+                    if (diffLineCount === 0) {
+                        console.log(`  ✓ No differences found with SEC version`);
+                    } else {
+                        console.log(`  Differences: ${diffLineCount} lines differ`);
+                        
+                        // Show first few lines of diff
+                        try {
+                            const { stdout: diffOutput } = await execAsync(`diff -u ${testCase.secVersion} ${testCase.output} | head -30`);
+                            console.log(`  First differences:\n${diffOutput}`);
+                        } catch (e) {
+                            // diff returns non-zero when files differ, but that's expected
+                            if (e.stdout) {
+                                console.log(`  First differences:\n${e.stdout}`);
+                            }
+                        }
+                    }
+                } catch (diffError) {
+                    console.log(`  Error running diff: ${diffError.message}`);
+                }
+            } else {
+                console.log(`  ✗ Extraction failed: ${result.message}`);
+                if (result.stdout) console.log(`  stdout: ${result.stdout.substring(0, 500)}`);
+                if (result.stderr) console.log(`  stderr: ${result.stderr.substring(0, 500)}`);
+            }
+            
+        } catch (error) {
+            console.log(`  ✗ Error: ${error.message}`);
+        }
+    }
+    
+    console.log('\nStatus: OK\n');
+}
 
 
 
