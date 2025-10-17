@@ -12,6 +12,8 @@ import { join } from 'path';
 import { validateXMLWithXSD } from 'validate-with-xmllint';
 import mysql from 'mysql2/promise';
 import { config } from './config.mjs';
+import Handlebars from 'handlebars';
+import { readFile } from 'fs/promises';
 
 // AWS clients
 const s3Client = new S3Client({ region: 'us-east-1' });
@@ -20,6 +22,9 @@ const sqsClient = new SQSClient({ region: 'us-east-1' });
 // Module-level variables for SEC Fair Use Policy
 let recentSecRequest = false;
 let secRequestTimer = null;
+
+// Module-level variable for SGML template
+let sgmlHandlebarsTemplate = null;
 
 // Database connection pools
 const connectionPools = {};
@@ -1070,6 +1075,57 @@ export const validateXML = async (xmlS3Source, xsdS3Sources) => {
     }
 };
 
+/**
+ * Generate SGML from filing metadata using Handlebars template
+ * @param {Object} filingMetaData - The filing metadata object with submission property
+ * @returns {string} - Normalized SGML string
+ */
+export const createSgml = async function(filingMetaData) {
+    try {
+        // Compile template if not already compiled
+        if (!sgmlHandlebarsTemplate) {
+            // Read and compile the Handlebars templates
+            const templateSource = await readFile('./sgml_template.handlebars', 'utf-8');
+            const entityPartialSource = await readFile('./sgml_entity_partial.handlebars', 'utf-8');
+            
+            // Register the entity partial
+            Handlebars.registerPartial('entity', entityPartialSource);
+            
+            // Register a custom helper to check if a property exists (even if it's an empty string)
+            Handlebars.registerHelper('hasProperty', function(obj, propName) {
+                return obj && obj.hasOwnProperty(propName);
+            });
+            
+            // Register helper to check if this is an investment company form (N-2, N-14, 486 series, etc.)
+            Handlebars.registerHelper('isInvestmentCompanyForm', function(formType) {
+                if (!formType) return false;
+                const rootForm = formType.split('/')[0].trim();
+                const investmentForms = ['N-2', 'N-14', '486APOS', '486BPOS', '486BXT', 'N-2ASR', 'POS 8C', 'N-14 8C', '485APOS', '485BPOS', '485BXT'];
+                return investmentForms.includes(rootForm);
+            });
+            
+            // Compile the main template
+            sgmlHandlebarsTemplate = Handlebars.compile(templateSource);
+        }
+        
+        // Generate SGML from the metadata using the template
+        const generatedSgml = sgmlHandlebarsTemplate(filingMetaData.submission);
+        
+        // Normalize the generated SGML
+        const normalizeString = (str) => {
+            return str
+                .replace(/\r\n/g, '\n')  // Normalize line endings
+                .replace(/\n+/g, '\n')   // Remove extra blank lines
+                .trim();
+        };
+        
+        return normalizeString(generatedSgml);
+        
+    } catch (error) {
+        throw new Error(`createSgml Error: ${error.message}`);
+    }
+};
+
 // Export common object with all functions
 export const common = {
     s3ReadString,
@@ -1089,5 +1145,6 @@ export const common = {
     extractIntId,
     fetchSubmissionMetadata,
     extractXbrlFromIxbrl,
-    validateXML
+    validateXML,
+    createSgml
 };
