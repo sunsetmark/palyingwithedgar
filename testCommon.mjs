@@ -399,6 +399,125 @@ if (shouldRunTest(9)) {
     }
 }
 
+// Test 10: makeDisseminationFile - Create dissemination files and compare with originals
+if (shouldRunTest(10)) {
+    console.log('Test 10: makeDisseminationFile - Create dissemination files and compare with originals');
+    try {
+        // Query for filings from 20240401 with .nc extension
+        const filings = await common.runQuery(
+            'POC',
+            `SELECT feeds_date, feeds_file, adsh 
+             FROM feeds_file 
+             WHERE feeds_date = '20240401' 
+             AND feeds_file LIKE '%.nc' 
+             LIMIT 200`
+        );
+        
+        console.log(`Found ${filings.length} filings to process\n`);
+        
+        let filesProcessed = 0;
+        let filesWithDifferences = 0;
+        let filesWithErrors = 0;
+        
+        for (const filing of filings) {
+            try {
+                const { feeds_date, feeds_file, adsh } = filing;
+                const accessionNumber = adsh;
+                
+                console.log(`\nProcessing ${filesProcessed + 1}/${filings.length}: ${accessionNumber} (${feeds_file})`);
+                
+                // Fetch submission metadata from database
+                const filingMetadata = await common.fetchSubmissionMetadata(accessionNumber);
+                
+                // Define S3 paths (matching edgarFeedsDownloader config)
+                const documentsBucket = 'test.publicdata.guru';
+                const documentsBucketFolder = `EdgarFileSystem/PublicFilings/${accessionNumber}/`;
+                const dissemBucket = 'test.publicdata.guru';
+                const dissemFileKey = `EdgarFileSystem/PublicFilings/${accessionNumber}/${accessionNumber}.dissem`;
+                
+                // Create dissemination file
+                console.log(`  Creating dissemination file: ${dissemFileKey}`);
+                const result = await common.makeDisseminationFile(
+                    filingMetadata,
+                    documentsBucket,
+                    documentsBucketFolder,
+                    dissemBucket,
+                    dissemFileKey
+                );
+                
+                console.log(`  ${result.message}`);
+                
+                // Read the generated .dissem file from S3
+                const generatedContent = await common.s3ReadString(dissemBucket, dissemFileKey);
+                
+                // Read the original .nc file from local filesystem
+                const { readFile } = await import('fs/promises');
+                const originalPath = `/data/feeds/${feeds_date}/${feeds_file}`;
+                const originalContent = await readFile(originalPath, 'utf-8');
+                
+                // Normalize both for comparison
+                const normalizeString = (str) => {
+                    return str
+                        .replace(/\r\n/g, '\n')  // Normalize line endings
+                        .replace(/\n+$/g, '\n')  // Remove trailing blank lines
+                        .trim();
+                };
+                
+                const normalizedGenerated = normalizeString(generatedContent);
+                const normalizedOriginal = normalizeString(originalContent);
+                
+                // Compare the files
+                if (normalizedGenerated === normalizedOriginal) {
+                    console.log(`  ✓ Perfect match with original .nc file`);
+                } else {
+                    console.log(`  ✗ Differences found!`);
+                    console.log(`  Generated length: ${normalizedGenerated.length} bytes`);
+                    console.log(`  Original length: ${normalizedOriginal.length} bytes`);
+                    
+                    // Find first difference
+                    const minLength = Math.min(normalizedGenerated.length, normalizedOriginal.length);
+                    let firstDiffPos = -1;
+                    for (let i = 0; i < minLength; i++) {
+                        if (normalizedGenerated[i] !== normalizedOriginal[i]) {
+                            firstDiffPos = i;
+                            break;
+                        }
+                    }
+                    
+                    if (firstDiffPos !== -1) {
+                        const start = Math.max(0, firstDiffPos - 100);
+                        const end = Math.min(firstDiffPos + 100, minLength);
+                        console.log(`  First difference at position ${firstDiffPos}:`);
+                        console.log(`  Generated: ...${normalizedGenerated.substring(start, end)}...`);
+                        console.log(`  Original:  ...${normalizedOriginal.substring(start, end)}...`);
+                    } else if (normalizedGenerated.length !== normalizedOriginal.length) {
+                        console.log(`  Files match up to position ${minLength}, but lengths differ`);
+                    }
+                    
+                    filesWithDifferences++;
+                }
+                
+                filesProcessed++;
+                
+            } catch (fileError) {
+                console.log(`  ✗ Error processing filing: ${fileError.message}`);
+                filesWithErrors++;
+            }
+        }
+        
+        console.log(`\n  Summary:`);
+        console.log(`    Processed: ${filesProcessed} files`);
+        console.log(`    Perfect matches: ${filesProcessed - filesWithDifferences} files`);
+        console.log(`    With differences: ${filesWithDifferences} files`);
+        console.log(`    With errors: ${filesWithErrors} files`);
+        console.log('Status: OK\n');
+        
+    } catch (error) {
+        console.log(`Status: ERROR - ${error.message}\n`);
+        console.error(error.stack);
+    }
+}
+
 
 
 /**

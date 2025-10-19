@@ -14,6 +14,8 @@ import mysql from 'mysql2/promise';
 import { config } from './config.mjs';
 import Handlebars from 'handlebars';
 import { readFile } from 'fs/promises';
+import uuencode from 'uuencode';
+import { PassThrough } from 'stream';
 
 // AWS clients
 const s3Client = new S3Client({ region: 'us-east-1' });
@@ -77,13 +79,13 @@ export const s3ReadLine = async (bucket, key) => {
     }
 };
 
-export const s3WriteString = async (bucket, key, body) => {
+export const s3WriteString = async (bucket, key, body, contentType = 'text/plain') => {
     try {
         const command = new PutObjectCommand({
             Bucket: bucket,
             Key: key,
             Body: body,
-            ContentType: 'text/plain'
+            ContentType: contentType
         });
         await s3Client.send(command);
         return { success: true, message: 'String written to S3 successfully' };
@@ -495,9 +497,8 @@ export const fetchSubmissionMetadata = async function(adsh) {
             
             if (entityRow.assigned_sic) entityData.assigned_sic = entityRow.assigned_sic;
             // Always include organization_name even if empty (matches writeSubmissionHeaderRecords behavior)
-            if (entityRow.organization_name !== null) {
-                entityData.organization_name = entityRow.organization_name;
-            }
+            // Set to empty string if null to ensure the SGML template outputs <ORGANIZATION-NAME>
+            entityData.organization_name = entityRow.organization_name || '';
             if (entityRow.irs_number) entityData.irs_number = entityRow.irs_number;
             if (entityRow.state_of_incorporation) {
                 entityData.state_of_incorporation = entityRow.state_of_incorporation;
@@ -1126,6 +1127,206 @@ export const createSgml = async function(filingMetaData) {
     }
 };
 
+/**
+ * Create a dissemination file from filing metadata and document files
+ * @param {Object} filingMetadata - The filing metadata object with submission property
+ * @param {string} documentsBucket - S3 bucket containing document files
+ * @param {string} documentsBucketFolder - S3 folder path for document files
+ * @param {string} dissemBucket - S3 bucket for dissemination file output
+ * @param {string} dissemFileKey - S3 key for dissemination file output
+ * @returns {Promise<Object>} - Result object with success status
+ * 
+ * UUENCODE issues:  While the .DISSEM uuencoded binary files decode correctly, the text representation does not match SEC format due variation is the final line termination character.
+ *   Resolution will require examine the SEC source code that performs uuencoding and reserve engineering the solution
+ * 
+ * No tool matches SEC format:
+ *     -  Linux uuencode tool: Uses backticks for padding - doesn't match SEC format
+ *     -  NPM uuencode library: Uses spaces for padding - doesn't match SEC format
+ *     -  SEC format: Uses proprietary padding (!, $!, D!) - unique to SEC
+ *
+ * SEC's UUENCODE Padding Rules (identified patterns):
+ *     -  For 1 remaining byte: Always $! (100% consistent, 16/16 files)
+ *     -  For 2 remaining bytes: Multiple patterns based on encoding variation:
+ *        -  ! - Most common (9/11 files)
+ *        -  Space + ! - Rare (1/11 files)
+ *        -  D! - Special encoding variant (1/11 files)
+ *
+ *     Critical Discovery:
+ *     -  The D! case revealed that SEC sometimes uses a different encoding algorithm for partial groups than the npm library. Both encodings:
+ *        -  Are valid UUENCODE
+ *        -  Decode to identical binary data
+ *        -  Have different text representations
+ */
+export const makeDisseminationFile = async function(filingMetadata, documentsBucket, documentsBucketFolder, dissemBucket, dissemFileKey) {
+    try {
+        // Generate SGML metadata
+        const sgmlString = await createSgml(filingMetadata);
+        const sgmlLines = sgmlString.split('\n');
+        
+        // Create a PassThrough stream to collect all output
+        const outputStream = new PassThrough();
+        const chunks = [];
+        
+        outputStream.on('data', chunk => chunks.push(chunk));
+        
+        // Process SGML lines
+        let thisFileName = null;
+        
+        for (const line of sgmlLines) {
+            const trimmedLine = line.trim();
+            
+            // Check for <FILENAME>
+            if (trimmedLine.startsWith('<FILENAME>')) {
+                thisFileName = trimmedLine.substring('<FILENAME>'.length);
+            }
+            
+            // Check for <DOCUMENT> tag
+            if (trimmedLine === '<DOCUMENT>') {
+                thisFileName = null;
+            }
+            
+            // Check for </DOCUMENT> tag - insert document content before it
+            if (trimmedLine === '</DOCUMENT>' && thisFileName) {
+                // Insert <TEXT>, document content, and </TEXT> before </DOCUMENT>
+                const documentKey = documentsBucketFolder + thisFileName;
+                
+                try {
+                    // Get file extension
+                    const fileExtension = thisFileName.split('.').pop().toLowerCase();
+                    const isBinary = ['pdf', 'gif', 'jpg', 'png', 'xlsx', 'zip', 'xls'].includes(fileExtension);
+                    
+                    // Write <TEXT> tag
+                    outputStream.write('<TEXT>\n');
+                    
+                    // Open read stream for the document
+                    const documentStream = await s3ReadStream(documentsBucket, documentKey);
+                    const documentSize = await  s3ReadString(documentsBucket, documentKey);
+                    if (isBinary) {
+                        // For PDF files, write <PDF> tag before content
+                        if (fileExtension === 'pdf') {
+                            outputStream.write('<PDF>\n');
+                        }
+                        
+                        // Read the entire binary file into a buffer
+                        const documentChunks = [];
+                        for await (const chunk of documentStream) {
+                            documentChunks.push(chunk);
+                        }
+                        const documentBuffer = Buffer.concat(documentChunks);
+                        
+                        // UUEncode the binary content with header and footer
+                        outputStream.write(`begin 644 ${thisFileName}\n`);
+                        const uuencodedContent = uuencode.encode(documentBuffer);
+                        
+                        // Process UUENCODED lines to match SEC format
+                        const uuencodedLines = uuencodedContent.split('\n');
+                        
+                        // SEC adds padding to complete partial quads in the last data line
+                        // Find the last non-empty line (last data line before the terminator/blank)
+                        let lastDataLineIdx = -1;
+                        for (let i = uuencodedLines.length - 1; i >= 0; i--) {
+                            if (uuencodedLines[i].length > 0 && uuencodedLines[i][0] !== '`') {
+                                lastDataLineIdx = i;
+                                break;
+                            }
+                        }
+                        
+                        // Remove trailing spaces from all lines EXCEPT the last data line
+                        for (let i = 0; i < uuencodedLines.length; i++) {
+                            if (i !== lastDataLineIdx) {
+                                uuencodedLines[i] = uuencodedLines[i].trimEnd();
+                            }
+                        }
+                        
+                        // Process the last data line for padding
+                        if (lastDataLineIdx >= 0) {
+                            let lastLine = uuencodedLines[lastDataLineIdx];
+                            const lengthCharCode = lastLine.charCodeAt(0);
+                            const decodedBytes = (lengthCharCode - 32) & 0x3f;
+                            
+                            // Calculate how many characters should be in the encoded data
+                            const fullGroups = Math.floor(decodedBytes / 3);
+                            const remainingBytes = decodedBytes % 3;
+                            const expectedDataChars = fullGroups * 4 + (remainingBytes > 0 ? remainingBytes + 1 : 0);
+                            
+                            if (remainingBytes > 0) {
+                                // Partial group exists - SEC uses specific padding
+                                const lengthChar = lastLine[0];
+                                const dataPortion = lastLine.substring(1, 1 + expectedDataChars);
+                                
+                                // SEC padding pattern based on remaining bytes and what library produced:
+                                if (remainingBytes === 1) {
+                                    // 1 remaining byte → always append "$!"
+                                    uuencodedLines[lastDataLineIdx] = lengthChar + dataPortion + '$!';
+                                } else if (remainingBytes === 2) {
+                                    // 2 remaining bytes → check if library has trailing spaces
+                                    // If line length matches expected (no extra library padding), add "D!"
+                                    // If library added trailing spaces, replace last space with "!"
+                                    const fullLineLength = lastLine.trimEnd().length;
+                                    const expectedLineLength = 1 + expectedDataChars; // length char + data chars
+                                    
+                                    if (fullLineLength === expectedLineLength) {
+                                        // Library produced exact data chars, add "D!" padding
+                                        uuencodedLines[lastDataLineIdx] = lengthChar + dataPortion + 'D!';
+                                    } else {
+                                        // Library added trailing spaces, replace last space with "!"
+                                        uuencodedLines[lastDataLineIdx] = lengthChar + dataPortion + '!';
+                                    }
+                                }
+                            } else {
+                                // No partial group - trim trailing spaces
+                                uuencodedLines[lastDataLineIdx] = lastLine.trimEnd();
+                            }
+                        }
+                        
+                        outputStream.write(uuencodedLines.join('\n'));
+                        outputStream.write('\nend');
+                        
+                        // For PDF files, write </PDF> tag after content
+                        if (fileExtension === 'pdf') {
+                            outputStream.write('\n</PDF>');
+                        }
+                    } else {
+                        // For non-binary files, stream directly
+                        for await (const chunk of documentStream) {
+                            outputStream.write(chunk);
+                        }
+                    }
+                    
+                    // Write </TEXT> tag
+                    outputStream.write('\n</TEXT>\n');
+                    
+                } catch (fileError) {
+                    // File doesn't exist or error reading - write empty TEXT section
+                    console.warn(`Warning: Could not read document file ${documentKey}: ${fileError.message}`);
+                    outputStream.write('</TEXT>\n');
+                }
+                
+                // Reset filename after processing
+                thisFileName = null;
+            }
+            
+            // Write the current SGML line
+            outputStream.write(line + '\n');
+        }
+        
+        // Close the output stream
+        outputStream.end();
+        
+        // Wait for all chunks to be collected
+        await new Promise((resolve) => outputStream.on('end', resolve));
+        
+        // Combine all chunks and write to S3
+        const finalContent = Buffer.concat(chunks);
+        await s3WriteString(dissemBucket, dissemFileKey, finalContent, 'text/plain');
+        
+        return { success: true, dissemKey: dissemFileKey, message: `Dissemination file created: ${dissemFileKey}` };
+        
+    } catch (error) {
+        throw new Error(`makeDisseminationFile Error: ${error.message}`);
+    }
+};
+
 // Export common object with all functions
 export const common = {
     s3ReadString,
@@ -1146,5 +1347,6 @@ export const common = {
     fetchSubmissionMetadata,
     extractXbrlFromIxbrl,
     validateXML,
-    createSgml
+    createSgml,
+    makeDisseminationFile
 };

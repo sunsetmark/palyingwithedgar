@@ -77,6 +77,7 @@ export async function processFeedFile(processInfo) {
     readInterface.on('line', async function(line) {
         let tLine = line.trim();
         if (submission.readState == READ_STATES.INIT) { //submission header prior to first <DOCUMENT>
+            if (tLine.startsWith('<ACCESSION-NUMBER>')) submission.adsh = tLine.substring('<ACCESSION-NUMBER>'.length);
             if(line.startsWith('<DELETION>') || line.startsWith('<CORRECTION>')) {
                 console.log(line, processInfo.path + processInfo.name);
             }
@@ -91,27 +92,27 @@ export async function processFeedFile(processInfo) {
                 if (entity.sic && submission.sics.indexOf(entity.sic)==-1) submission.sics.push(entity.sic);
                 if(submission.ciks.indexOf(entity.cik) == -1) submission.ciks.push(entity.cik);
             }  //ignores <DEPOSITOR-CIK> && <OWNER-CIK> (see path analysis below)
-            if (tLine.startsWith('<CIK>')) entity.cik = tLine.substr('<CIK>'.length);
-            if (tLine.startsWith('<ASSIGNED-SIC>')) entity.sic = tLine.substr('<ASSIGNED-SIC>'.length);
-            if (tLine.startsWith('<STATE-OF-INCORPORATION>')) entity.incorporationState = tLine.substr('<STATE-OF-INCORPORATION>'.length);
-            if (tLine.startsWith('<CONFORMED-NAME>')) entity.name = tLine.substr('<CONFORMED-NAME>'.length);
+            if (tLine.startsWith('<CIK>')) entity.cik = tLine.substring('<CIK>'.length);
+            if (tLine.startsWith('<ASSIGNED-SIC>')) entity.sic = tLine.substring('<ASSIGNED-SIC>'.length);
+            if (tLine.startsWith('<STATE-OF-INCORPORATION>')) entity.incorporationState = tLine.substring('<STATE-OF-INCORPORATION>'.length);
+            if (tLine.startsWith('<CONFORMED-NAME>')) entity.name = tLine.substring('<CONFORMED-NAME>'.length);
 
             if (tLine == '<BUSINESS-ADDRESS>' || tLine == '<MAIL-ADDRESS>') address = {};
             if (tLine == '</BUSINESS-ADDRESS>') entity.mailingAddress = address;
             if (tLine == '</MAIL-ADDRESS>') entity.businessAddress = address;
 
-            if (tLine.startsWith('<STATE>')) address.state = tLine.substr('<STATE>'.length);
-            if (tLine.startsWith('<CITY>')) address.city = tLine.substr('<CITY>'.length);
+            if (tLine.startsWith('<STATE>')) address.state = tLine.substring('<STATE>'.length);
+            if (tLine.startsWith('<CITY>')) address.city = tLine.substring('<CITY>'.length);
 
 
-            if (tLine.startsWith('<TYPE>')) submission.form = tLine.substr('<TYPE>'.length).toUpperCase();
-            if (tLine.startsWith('<PERIOD>')) submission.periodEnding = tLine.substr('<PERIOD>'.length).toUpperCase();
+            if (tLine.startsWith('<TYPE>')) submission.form = tLine.substring('<TYPE>'.length).toUpperCase();
+            if (tLine.startsWith('<PERIOD>')) submission.periodEnding = tLine.substring('<PERIOD>'.length).toUpperCase();
 
-            if (tLine.startsWith('<FILING-DATE>')) submission.filingDate = tLine.substr('<FILING-DATE>'.length);
-            if (tLine.startsWith('<ACCEPTANCE-DATETIME>')) submission.acceptanceDateTime = tLine.substr('<ACCEPTANCE-DATETIME>'.length);
-            if (tLine.startsWith('<ACCESSION-NUMBER>')) submission.adsh = tLine.substr('<ACCESSION-NUMBER>'.length);
-            if (tLine.startsWith('<FILE-NUMBER>')) submission.fileNumber = tLine.substr('<FILE-NUMBER>'.length);
-            if (tLine.startsWith('<FILM-NUMBER>')) submission.filmNumber = tLine.substr('<FILM-NUMBER>'.length); */
+            if (tLine.startsWith('<FILING-DATE>')) submission.filingDate = tLine.substring('<FILING-DATE>'.length);
+            if (tLine.startsWith('<ACCEPTANCE-DATETIME>')) submission.acceptanceDateTime = tLine.substring('<ACCEPTANCE-DATETIME>'.length);
+            if (tLine.startsWith('<ACCESSION-NUMBER>')) submission.adsh = tLine.substring('<ACCESSION-NUMBER>'.length);
+            if (tLine.startsWith('<FILE-NUMBER>')) submission.fileNumber = tLine.substring('<FILE-NUMBER>'.length);
+            if (tLine.startsWith('<FILM-NUMBER>')) submission.filmNumber = tLine.substring('<FILM-NUMBER>'.length); */
             if (tLine == '<DOCUMENT>') {
                 submission.readState = READ_STATES.DOC_HEADER;
             }
@@ -141,9 +142,25 @@ export async function processFeedFile(processInfo) {
                             }
                             doc.lines.shift(); //begin 644 ex991to13da108016015_010219.ext
                             doc.lines.pop();  //end
-                            fileWritePromises.push(writeFile(docFileName, uuencode.decode(doc.lines.join('\n')), 'binary')); 
+                            fileWritePromises.push( writeFile(docFileName, uuencode.decode(doc.lines.join('\n')), 'binary')); 
+                            fileWritePromises.push( 
+                                common.s3WriteString(
+                                    processInfo.extractedFilesBucket, 
+                                    processInfo.extractedFilesPrefix + submission.adsh + '/' + doc.fileName, 
+                                    uuencode.decode(doc.lines.join('\n')), 
+                                    doc.fileExtension=='pdf' ? 'application/pdf' : 'application/jpeg'
+                                )
+                            ); 
                         } else {
                             fileWritePromises.push(writeFile(docFileName, doc.lines.join('\n'), 'utf-8')); 
+                            fileWritePromises.push( 
+                                common.s3WriteString(
+                                    processInfo.extractedFilesBucket, 
+                                    processInfo.extractedFilesPrefix + submission.adsh + '/' + doc.fileName, 
+                                    doc.lines.join('\n'), 
+                                    'utf-8'
+                                )
+                            );
                         } 
                     } else {
                         throw ('missing fileName for doc ' + d + ' in ' + processInfo.fileName);
@@ -172,11 +189,11 @@ export async function processFeedFile(processInfo) {
             } else {
                 const d = submission.docs.length - 1;
                 if (tLine.startsWith('<FILENAME>')) {  //can't wait for final SGML parse:  need to know if binary and what file name to save as
-                    submission.docs[d].fileName = tLine.substr('<FILENAME>'.length);
+                    submission.docs[d].fileName = tLine.substring('<FILENAME>'.length);
                     submission.docs[d].fileExtension = submission.docs[d].fileName.split('.').pop().toLowerCase().trim();
                 }
                 if(tLine.startsWith('<SEQUENCE>')) { 
-                    submission.docs[d].sequence = tLine.substr('<SEQUENCE>'.length);
+                    submission.docs[d].sequence = tLine.substring('<SEQUENCE>'.length);
                 }
                 if (tLine == '<TEXT>') {
                     submission.readState = READ_STATES.DOC_BODY;
@@ -208,10 +225,16 @@ export async function processFeedFile(processInfo) {
             // Copy source file to filing folder if it's a correction, which also covers deletions
             if(submissionMetadata.submission.correction) {
                 const sourceFile = processInfo.path + processInfo.name;
-                const destFile = docFilingFolder + processInfo.feedDate + '_' + processInfo.name;
-                fileWritePromises.push(copyFile(sourceFile, destFile));
+                if(submissionMetadata.submission.deletion) {
+                    await execAsync("sudo mkdir -p -m 777 ~/poc/samples/deletions/");   //write the deletions and correction to a persisted sample folder
+                    const destFile = '~/poc/samples/deletions/' + processInfo.feedDate + '_' + processInfo.name;
+                    fileWritePromises.push(copyFile(sourceFile, destFile));
+                } else {
+                    await execAsync("sudo mkdir -p -m 777 ~/poc/samples/corrections/");   //write the deletions and correction to a persisted sample folder
+                    const destFile = '~/poc/samples/corrections/' + processInfo.feedDate + '_' + processInfo.name;
+                    fileWritePromises.push(copyFile(sourceFile, destFile));
+                }
             }
-            
             // Write feeds metadata to database
             if (submissionMetadata && submissionMetadata.submission) {
                 writeFeedsMetaData(submissionMetadata.submission, processInfo.feedDate, processInfo.name);
@@ -1024,14 +1047,14 @@ export async function processFeedFile(processInfo) {
 //used to analyze SGL path across all filing to ensure compliance
 function findPaths(headerLines, partialPropertyTag, paths){
     headerLines.forEach((headerLine, index,)=>{
-        if(headerLine.indexOf(partialPropertyTag) != -1 && headerLine.substr(0,2)!='</'){  //find path back to <SUBMISSION>
+        if(headerLine.indexOf(partialPropertyTag) != -1 && headerLine.substring(0,2)!='</'){  //find path back to <SUBMISSION>
             let path = [headerLine.split('>')[0]+'>'];
             for(let i=index-1;i>=0;i--){
-                if(headerLines[i].substr(headerLines[i].length-1)=='>'){ //section start or end tag
-                    if(headerLines[i].substr(0,2)=='</'){
+                if(headerLines[i].substring(headerLines[i].length-1)=='>'){ //section start or end tag
+                    if(headerLines[i].substring(0,2)=='</'){
                         path.push(headerLines[i]);
                     } else {
-                        if(headerLines[i].substr(1) == path[path.length-1].substr(2)){
+                        if(headerLines[i].substring(1) == path[path.length-1].substring(2)){
                             path.pop(); //matching opening and closing tags
                         } else {
                             path.push(headerLines[i]);
