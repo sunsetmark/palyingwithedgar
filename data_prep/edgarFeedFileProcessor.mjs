@@ -1,7 +1,7 @@
 // EDGAR Feed File Processor - Processes individual EDGAR submission files
 // Converted from edgarFullTextSearchSubmissionIngest.js to use common.mjs and modern Node.js
 
-import { common } from './common.mjs';
+import { common } from '../server/common.mjs';
 import { sgmlToJson, tagToJson } from './sgmlToJson.mjs';
 import { createReadStream } from 'fs';
 import { createInterface } from 'readline';

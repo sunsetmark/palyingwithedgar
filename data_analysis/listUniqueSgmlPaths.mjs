@@ -26,7 +26,7 @@ import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 
 // Import common.mjs
-import { common } from './common.mjs';
+import { common } from '../server/common.mjs';
 
 // Module level constant for SGML array tags (from sgmlToJson.mjs)
 const SGML_ARRAY_TAGS = [

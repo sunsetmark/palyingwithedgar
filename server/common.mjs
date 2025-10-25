@@ -8,7 +8,8 @@ import { createGunzip } from 'zlib';
 import { promisify } from 'util';
 import { pipeline } from 'stream/promises';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { validateXMLWithXSD } from 'validate-with-xmllint';
 import mysql from 'mysql2/promise';
 import { config } from './config.mjs';
@@ -16,6 +17,10 @@ import Handlebars from 'handlebars';
 import { readFile } from 'fs/promises';
 import uuencode from 'uuencode';
 import { PassThrough } from 'stream';
+
+// Get __dirname equivalent for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // AWS clients
 const s3Client = new S3Client({ region: 'us-east-1' });
@@ -1086,8 +1091,8 @@ export const createSgml = async function(filingMetaData) {
         // Compile template if not already compiled
         if (!sgmlHandlebarsTemplate) {
             // Read and compile the Handlebars templates
-            const templateSource = await readFile('./sgml_template.handlebars', 'utf-8');
-            const entityPartialSource = await readFile('./sgml_entity_partial.handlebars', 'utf-8');
+            const templateSource = await readFile(join(__dirname, 'sgml_template.handlebars'), 'utf-8');
+            const entityPartialSource = await readFile(join(__dirname, 'sgml_entity_partial.handlebars'), 'utf-8');
             
             // Register the entity partial
             Handlebars.registerPartial('entity', entityPartialSource);

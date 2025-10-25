@@ -4,8 +4,8 @@
 // run in screen:   
 // screen -S edgarFeedsDownloader -L -Logfile /data/edgarFeedsDownloader.log node edgarFeedsDownloader.mjs
 
-import { common } from './common.mjs';
-import { config } from './config.mjs';
+import { common } from '../server/common.mjs';
+import { config } from '../server/config.mjs';
 import { exec, fork } from 'child_process';
 //import { promisify } from 'util';
 import fs from 'fs';

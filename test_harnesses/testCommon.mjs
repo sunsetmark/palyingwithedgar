@@ -1,5 +1,5 @@
 // Test script for common.mjs functions
-import { common } from './common.mjs';
+import { common } from '../server/common.mjs';
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -410,7 +410,7 @@ if (shouldRunTest(10)) {
              FROM feeds_file 
              WHERE feeds_date = '20240401' 
              AND feeds_file LIKE '%.nc' 
-             LIMIT 200`
+             LIMIT 2000`
         );
         
         console.log(`Found ${filings.length} filings to process\n`);
