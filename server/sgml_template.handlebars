@@ -51,8 +51,9 @@
 {{/if~}}
 {{~#each filer}}{{> entity entityType="FILER" data=this}}
 {{/each~}}
-{{~#each subject_company}}{{> entity entityType="SUBJECT-COMPANY" data=this}}
-{{/each~}}
+{{~#if subject_company}}{{#if subject_company.length}}{{#each subject_company}}{{> entity entityType="SUBJECT-COMPANY" data=this}}
+{{/each}}{{else}}{{> entity entityType="SUBJECT-COMPANY" data=subject_company}}
+{{/if}}{{/if~}}
 {{~#each reporting_owner}}{{> entity entityType="REPORTING-OWNER" data=this}}
 {{/each~}}
 {{~#if issuer}}{{> entity entityType="ISSUER" data=issuer}}
@@ -120,8 +121,9 @@
 {{~#unless (isInvestmentCompanyForm type)}}
 {{~#each filer}}{{> entity entityType="FILER" data=this}}
 {{/each~}}
-{{~#each subject_company}}{{> entity entityType="SUBJECT-COMPANY" data=this}}
-{{/each~}}
+{{~#if subject_company}}{{#if subject_company.length}}{{#each subject_company}}{{> entity entityType="SUBJECT-COMPANY" data=this}}
+{{/each}}{{else}}{{> entity entityType="SUBJECT-COMPANY" data=subject_company}}
+{{/if}}{{/if~}}
 {{~#each reporting_owner}}{{> entity entityType="REPORTING-OWNER" data=this}}
 {{/each~}}
 {{~#if issuer}}{{> entity entityType="ISSUER" data=issuer}}
