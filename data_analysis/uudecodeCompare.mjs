@@ -1,6 +1,5 @@
-// Utility to uudecode and compare UUENCODED representations from .dissem and .nc files
+// Utility to analyze UUENCODED last line padding by MOD 3 category
 import { common } from '../server/common.mjs';
-import { createHash } from 'crypto';
 
 /**
  * Decode a UUENCODED string to binary buffer
@@ -95,18 +94,35 @@ function extractUuencodedSections(content) {
 }
 
 /**
- * Calculate MD5 hash of a buffer
+ * Decode a single uuencoded line
  */
-function getMD5(buffer) {
-    return createHash('md5').update(buffer).digest('hex');
+function uudecodeLine(line) {
+    const lengthChar = line.charCodeAt(0);
+    const length = (lengthChar - 32) & 0x3f;
+    const dataChars = line.substring(1);
+    const buffer = Buffer.alloc(length);
+    let bufferPos = 0;
+    
+    for (let j = 0; j < dataChars.length && bufferPos < length; j += 4) {
+        const c1 = j < dataChars.length ? ((dataChars.charCodeAt(j) - 32) & 0x3f) : 0;
+        const c2 = j + 1 < dataChars.length ? ((dataChars.charCodeAt(j + 1) - 32) & 0x3f) : 0;
+        const c3 = j + 2 < dataChars.length ? ((dataChars.charCodeAt(j + 2) - 32) & 0x3f) : 0;
+        const c4 = j + 3 < dataChars.length ? ((dataChars.charCodeAt(j + 3) - 32) & 0x3f) : 0;
+        
+        if (bufferPos < length) buffer[bufferPos++] = (c1 << 2) | (c2 >> 4);
+        if (bufferPos < length) buffer[bufferPos++] = ((c2 & 0x0f) << 4) | (c3 >> 2);
+        if (bufferPos < length) buffer[bufferPos++] = ((c3 & 0x03) << 6) | c4;
+    }
+    
+    return buffer;
 }
 
 /**
- * Main function to compare UUENCODED representations
+ * Main function to analyze last line padding
  */
-async function compareUuencodedRepresentations() {
+async function analyzeLastLinePadding() {
     try {
-        // Query for 1000 filings to get robust statistics
+        // Query for 1000 filings
         const filings = await common.runQuery(
             'POC',
             `SELECT feeds_date, feeds_file, adsh 
@@ -120,16 +136,14 @@ async function compareUuencodedRepresentations() {
         
         const { readFile } = await import('fs/promises');
         
-        let totalSections = 0;
-        let matchingSections = 0;
-        let differingSections = 0;
-        
-        // Track ending patterns by file extension and (bytes MOD 3)
-        const endingPatternsByBytesAndExtension = {
-            0: {},  // bytes % 3 = 0 (evenly divisible)
-            1: {},  // bytes % 3 = 1 (1 byte remainder)
-            2: {}   // bytes % 3 = 2 (2 bytes remainder)
+        // Track results by MOD category
+        const mod0Results = {
+            matched: {},
+            total: {}
         };
+        
+        const mod1Results = {}; // Will store last 2 bytes by extension
+        const mod2Results = {}; // Will store last byte by extension
         
         for (const filing of filings) {
             const { feeds_date, feeds_file, adsh } = filing;
@@ -150,203 +164,156 @@ async function compareUuencodedRepresentations() {
                 const dissemSections = extractUuencodedSections(dissemContent);
                 
                 if (ncSections.length !== dissemSections.length) {
-                    console.log(`⚠ ${accessionNumber}: Different number of UUENCODED sections`);
-                    console.log(`  .nc has ${ncSections.length}, .dissem has ${dissemSections.length}`);
                     continue;
                 }
-                
-                let filingsHasDifferences = false;
                 
                 for (let i = 0; i < ncSections.length; i++) {
                     const ncSection = ncSections[i];
                     const dissemSection = dissemSections[i];
+                    const fileExtension = ncSection.filename.split('.').pop().toLowerCase();
                     
-                    totalSections++;
-                    
-                    // Track ending patterns for ALL sections based on actual byte count
+                    // Get the last data line
                     const ncLines = ncSection.uuencodedContent.trim().split('\n');
-                    // Find the last data line (skip 'end' and empty lines)
-                    let lastDataLine = null;
+                    const dissemLines = dissemSection.uuencodedContent.trim().split('\n');
+                    
+                    let ncLastDataLine = null;
+                    let dissemLastDataLine = null;
+                    
                     for (let j = ncLines.length - 1; j >= 0; j--) {
                         const line = ncLines[j].trim();
                         if (line !== '' && line !== 'end' && line !== '`' && !line.startsWith('begin ')) {
-                            lastDataLine = line;
+                            ncLastDataLine = line;
                             break;
                         }
                     }
                     
-                    if (lastDataLine && lastDataLine.length >= 2) {
-                        const fileExtension = ncSection.filename.split('.').pop().toLowerCase();
-                        
-                        // Decode the length byte (first character)
-                        const lengthChar = lastDataLine.charCodeAt(0);
-                        const actualBytes = (lengthChar - 32) & 0x3f;
-                        
-                        // Determine pattern based on actualBytes MOD 3
-                        const remainder = actualBytes % 3;
-                        let bytesCategory;
-                        let pattern;
-                        
-                        if (remainder === 1) {
-                            bytesCategory = 1;
-                            // For 1 byte remainder: get last 2 chars
-                            pattern = lastDataLine.slice(-2);
-                        } else if (remainder === 2) {
-                            bytesCategory = 2;
-                            // For 2 bytes remainder: get last 2 chars
-                            pattern = lastDataLine.slice(-2);
-                        } else {
-                            // remainder === 0 (evenly divisible by 3)
-                            bytesCategory = 0;
-                            pattern = lastDataLine.slice(-2);
+                    for (let j = dissemLines.length - 1; j >= 0; j--) {
+                        const line = dissemLines[j].trim();
+                        if (line !== '' && line !== 'end' && line !== '`' && !line.startsWith('begin ')) {
+                            dissemLastDataLine = line;
+                            break;
                         }
-                        
-                        if (!endingPatternsByBytesAndExtension[bytesCategory][pattern]) {
-                            endingPatternsByBytesAndExtension[bytesCategory][pattern] = {};
-                        }
-                        if (!endingPatternsByBytesAndExtension[bytesCategory][pattern][fileExtension]) {
-                            endingPatternsByBytesAndExtension[bytesCategory][pattern][fileExtension] = 0;
-                        }
-                        endingPatternsByBytesAndExtension[bytesCategory][pattern][fileExtension]++;
                     }
                     
-                    // Check if the UUENCODED text matches exactly
-                    const textMatches = ncSection.uuencodedContent === dissemSection.uuencodedContent;
+                    if (!ncLastDataLine || !dissemLastDataLine) continue;
                     
-                    if (textMatches) {
-                        matchingSections++;
-                        continue;
+                    // Get length and MOD
+                    const lengthChar = ncLastDataLine.charCodeAt(0);
+                    const length = (lengthChar - 32) & 0x3f;
+                    const mod = length % 3;
+                    
+                    // Initialize counters for this extension
+                    if (!mod0Results.total[fileExtension]) {
+                        mod0Results.total[fileExtension] = 0;
+                        mod0Results.matched[fileExtension] = 0;
                     }
                     
-                    // UUENCODED text differs - decode both and compare
-                    const ncDecoded = uudecode(ncSection.uuencodedContent);
-                    const dissemDecoded = uudecode(dissemSection.uuencodedContent);
-                    
-                    const ncMD5 = getMD5(ncDecoded);
-                    const dissemMD5 = getMD5(dissemDecoded);
-                    
-                    if (!filingsHasDifferences) {
-                        console.log(`\n📋 ${accessionNumber}:`);
-                        filingsHasDifferences = true;
-                    }
-                    
-                    console.log(`\n  File: ${ncSection.filename}`);
-                    console.log(`  UUENCODED text matches: NO`);
-                    console.log(`  .nc decoded size: ${ncDecoded.length} bytes (MD5: ${ncMD5})`);
-                    console.log(`  .dissem decoded size: ${dissemDecoded.length} bytes (MD5: ${dissemMD5})`);
-                    
-                    if (ncMD5 === dissemMD5) {
-                        console.log(`  ✓ Decoded binaries MATCH exactly (same MD5)`);
-                        matchingSections++;
-                    } else {
-                        console.log(`  ✗ Decoded binaries DIFFER`);
-                        
-                        // Find first difference in decoded binaries
-                        const minLength = Math.min(ncDecoded.length, dissemDecoded.length);
-                        let firstDiff = -1;
-                        for (let j = 0; j < minLength; j++) {
-                            if (ncDecoded[j] !== dissemDecoded[j]) {
-                                firstDiff = j;
-                                break;
-                            }
+                    if (mod === 0) {
+                        // MOD 0: Check if last lines match exactly
+                        mod0Results.total[fileExtension]++;
+                        if (ncLastDataLine === dissemLastDataLine) {
+                            mod0Results.matched[fileExtension]++;
                         }
+                    } else if (mod === 1) {
+                        // MOD 1: Add 2 bytes to length, decode, get last 2 bytes
+                        const newLengthChar = String.fromCharCode(lengthChar + 2);
+                        const modifiedLine = newLengthChar + ncLastDataLine.substring(1);
+                        const decoded = uudecodeLine(modifiedLine);
+                        const lastTwoBytes = decoded.slice(-2).toString('hex');
                         
-                        if (firstDiff !== -1) {
-                            console.log(`  First binary difference at byte ${firstDiff}`);
-                            const start = Math.max(0, firstDiff - 10);
-                            const end = Math.min(firstDiff + 10, minLength);
-                            console.log(`  .nc bytes [${start}:${end}]: ${ncDecoded.slice(start, end).toString('hex')}`);
-                            console.log(`  .dissem bytes [${start}:${end}]: ${dissemDecoded.slice(start, end).toString('hex')}`);
-                        } else {
-                            console.log(`  Binaries match up to ${minLength} bytes, but lengths differ`);
+                        if (!mod1Results[fileExtension]) {
+                            mod1Results[fileExtension] = {};
                         }
+                        if (!mod1Results[fileExtension][lastTwoBytes]) {
+                            mod1Results[fileExtension][lastTwoBytes] = 0;
+                        }
+                        mod1Results[fileExtension][lastTwoBytes]++;
+                    } else if (mod === 2) {
+                        // MOD 2: Add 1 byte to length, decode, get last byte
+                        const newLengthChar = String.fromCharCode(lengthChar + 1);
+                        const modifiedLine = newLengthChar + ncLastDataLine.substring(1);
+                        const decoded = uudecodeLine(modifiedLine);
+                        const lastByte = decoded.slice(-1).toString('hex');
                         
-                        // Show the last few lines of UUENCODED text for comparison
-                        const ncLines = ncSection.uuencodedContent.split('\n');
-                        const dissemLines = dissemSection.uuencodedContent.split('\n');
-                        
-                        console.log(`\n  Last 3 lines of .nc UUENCODED:`);
-                        ncLines.slice(-3).forEach((line, idx) => {
-                            const displayLine = line.replace(/ /g, '·'); // Show spaces as dots
-                            console.log(`    [${idx}] "${displayLine}" (${line.length} chars)`);
-                        });
-                        
-                        console.log(`  Last 3 lines of .dissem UUENCODED:`);
-                        dissemLines.slice(-3).forEach((line, idx) => {
-                            const displayLine = line.replace(/ /g, '·'); // Show spaces as dots
-                            console.log(`    [${idx}] "${displayLine}" (${line.length} chars)`);
-                        });
-                        
-                        differingSections++;
+                        if (!mod2Results[fileExtension]) {
+                            mod2Results[fileExtension] = {};
+                        }
+                        if (!mod2Results[fileExtension][lastByte]) {
+                            mod2Results[fileExtension][lastByte] = 0;
+                        }
+                        mod2Results[fileExtension][lastByte]++;
                     }
                 }
                 
             } catch (error) {
-                console.log(`✗ Error processing ${accessionNumber}: ${error.message}`);
+                // Skip files with errors
             }
+        }
+        
+        // Report results
+        console.log(`${'='.repeat(70)}`);
+        console.log('MOD 0 ANALYSIS: Last Line Exact Match');
+        console.log(`${'='.repeat(70)}\n`);
+        
+        const sortedMod0 = Object.entries(mod0Results.total)
+            .sort((a, b) => b[1] - a[1]);
+        
+        for (const [ext, total] of sortedMod0) {
+            const matched = mod0Results.matched[ext];
+            const percentage = ((matched / total) * 100).toFixed(1);
+            console.log(`  .${ext}: ${matched}/${total} matched (${percentage}%)`);
         }
         
         console.log(`\n${'='.repeat(70)}`);
-        console.log('SUMMARY:');
-        console.log(`  Total UUENCODED sections analyzed: ${totalSections}`);
-        console.log(`  Sections with matching decoded binaries: ${matchingSections}`);
-        console.log(`  Sections with differing decoded binaries: ${differingSections}`);
-        console.log(`${'='.repeat(70)}`);
-        
-        // Report on ending patterns organized by (bytes MOD 3)
-        console.log('\nENDING PATTERN ANALYSIS BY (LINE LENGTH MOD 3):');
+        console.log('MOD 1 ANALYSIS: Last 2 Padding Bytes (added 2 bytes to length)');
         console.log(`${'='.repeat(70)}\n`);
         
-        for (const bytesCategory of [0, 1, 2]) {
-            const patterns = endingPatternsByBytesAndExtension[bytesCategory];
+        const sortedMod1Exts = Object.entries(mod1Results)
+            .sort((a, b) => {
+                const totalA = Object.values(a[1]).reduce((sum, c) => sum + c, 0);
+                const totalB = Object.values(b[1]).reduce((sum, c) => sum + c, 0);
+                return totalB - totalA;
+            });
+        
+        for (const [ext, hexCounts] of sortedMod1Exts) {
+            const total = Object.values(hexCounts).reduce((sum, c) => sum + c, 0);
+            console.log(`File Type: .${ext} (${total} occurrences)`);
             
-            if (Object.keys(patterns).length === 0) continue;
+            const sortedHex = Object.entries(hexCounts)
+                .sort((a, b) => b[1] - a[1]);
             
-            const totalForCategory = Object.values(patterns)
-                .reduce((sum, extensions) => 
-                    sum + Object.values(extensions).reduce((s, c) => s + c, 0), 0);
-            
-            let categoryLabel;
-            if (bytesCategory === 0) {
-                categoryLabel = 'MOD 3 = 0 (evenly divisible by 3)';
-            } else if (bytesCategory === 1) {
-                categoryLabel = 'MOD 3 = 1 (1 byte remainder)';
-            } else {
-                categoryLabel = 'MOD 3 = 2 (2 bytes remainder)';
-            }
-            
-            console.log(`━━━ ${categoryLabel} (${totalForCategory} occurrences) ━━━\n`);
-            
-            // Sort patterns by total count descending
-            const patternCounts = Object.entries(patterns)
-                .map(([pattern, extensions]) => ({
-                    pattern,
-                    extensions,
-                    total: Object.values(extensions).reduce((sum, count) => sum + count, 0)
-                }))
-                .sort((a, b) => b.total - a.total);
-            
-            for (const { pattern, extensions, total } of patternCounts) {
-                // Show pattern with visible spaces
-                const displayPattern = pattern
-                    .replace(/ /g, '·')
-                    .replace(/\n/g, '\\n')
-                    .replace(/\r/g, '\\r')
-                    .replace(/\t/g, '\\t');
-                
-                console.log(`  Pattern "${displayPattern}": ${total} occurrences`);
-                
-                // Sort extensions by count descending
-                const sortedExtensions = Object.entries(extensions)
-                    .sort((a, b) => b[1] - a[1]);
-                
-                for (const [ext, count] of sortedExtensions) {
-                    const percentage = ((count / total) * 100).toFixed(1);
-                    console.log(`    .${ext}: ${count} (${percentage}%)`);
-                }
+            for (const [hex, count] of sortedHex) {
+                const percentage = ((count / total) * 100).toFixed(1);
+                console.log(`  ${hex}: ${count} (${percentage}%)`);
             }
             console.log();
         }
+        
+        console.log(`${'='.repeat(70)}`);
+        console.log('MOD 2 ANALYSIS: Last Padding Byte (added 1 byte to length)');
+        console.log(`${'='.repeat(70)}\n`);
+        
+        const sortedMod2Exts = Object.entries(mod2Results)
+            .sort((a, b) => {
+                const totalA = Object.values(a[1]).reduce((sum, c) => sum + c, 0);
+                const totalB = Object.values(b[1]).reduce((sum, c) => sum + c, 0);
+                return totalB - totalA;
+            });
+        
+        for (const [ext, hexCounts] of sortedMod2Exts) {
+            const total = Object.values(hexCounts).reduce((sum, c) => sum + c, 0);
+            console.log(`File Type: .${ext} (${total} occurrences)`);
+            
+            const sortedHex = Object.entries(hexCounts)
+                .sort((a, b) => b[1] - a[1]);
+            
+            for (const [hex, count] of sortedHex) {
+                const percentage = ((count / total) * 100).toFixed(1);
+                console.log(`  ${hex}: ${count} (${percentage}%)`);
+            }
+            console.log();
+        }
+        
         console.log(`${'='.repeat(70)}\n`);
         
     } catch (error) {
@@ -355,8 +322,8 @@ async function compareUuencodedRepresentations() {
     }
 }
 
-// Run the comparison
-compareUuencodedRepresentations()
+// Run the analysis
+analyzeLastLinePadding()
     .then(() => {
         console.log('Analysis complete.');
         process.exit(0);
@@ -365,4 +332,3 @@ compareUuencodedRepresentations()
         console.error('Fatal error:', error);
         process.exit(1);
     });
-

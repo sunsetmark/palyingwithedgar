@@ -293,6 +293,7 @@ if (shouldRunTest(8)) {
 
 // Test 9: createSgml - Generate and compare SGML from metadata
 if (shouldRunTest(9)) {
+    const start = Date.now();
     console.log('Test 9: createSgml - Generate and compare SGML from metadata');
     try {
         const { readdir, readFile } = await import('fs/promises');
@@ -393,7 +394,7 @@ if (shouldRunTest(9)) {
         }
         
         console.log(`\n  Summary: Processed ${filesProcessed} files, ${filesWithDifferences} had differences`);
-        console.log('Status: OK\n');
+        console.log('Execution time: '+ (Date.now() - start)/1000 + ' seconds\n');
     } catch (error) {
         console.log(`Status: ERROR - ${error.message}\n`);
     }
@@ -401,6 +402,7 @@ if (shouldRunTest(9)) {
 
 // Test 10: makeDisseminationFile - Create dissemination files and compare with originals
 if (shouldRunTest(10)) {
+    const start = Date.now();
     console.log('Test 10: makeDisseminationFile - Create dissemination files and compare with originals');
     try {
         // Query for filings from 20240401 with .nc extension
@@ -510,7 +512,7 @@ if (shouldRunTest(10)) {
         console.log(`    Perfect matches: ${filesProcessed - filesWithDifferences} files`);
         console.log(`    With differences: ${filesWithDifferences} files`);
         console.log(`    With errors: ${filesWithErrors} files`);
-        console.log('Status: OK\n');
+        console.log('Execution time: '+ (Date.now() - start)/1000 + ' seconds\n');
         
     } catch (error) {
         console.log(`Status: ERROR - ${error.message}\n`);

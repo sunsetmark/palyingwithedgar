@@ -13,7 +13,7 @@ import { fstat } from 'node:fs';
 const execAsync = promisify(exec);
 
 // Constants
-const BINARY_EXT = [ 'pdf', 'gif', 'jpg', 'png', 'xlsx', 'zip', 'xls' ];
+const BINARY_EXT = [ 'pdf', 'gif', 'jpg', 'png', 'xlsx', 'zip', 'xls', 'xlsx' ];
 
 const READ_STATES = {
         INIT: 'INIT',
