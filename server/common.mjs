@@ -1162,6 +1162,77 @@ export const createSgml = async function(filingMetaData) {
  *        -  Decode to identical binary data
  *        -  Have different text representations
  */
+
+/**
+ * EDGAR-compatible uuencode function
+ * Encodes binary data in EDGAR's uuencode format with proper padding
+ * 
+ * @param {Buffer} binaryBuffer - The binary data to encode
+ * @param {string} fileName - The filename to include in the begin line
+ * @returns {string} - The uuencoded string
+ */
+export const uuEdgarEncode = function(binaryBuffer, fileName) {
+    const lines = [];
+    
+    // Add begin line
+    lines.push(`begin 644 ${fileName}`);
+    
+    // Encode 45 bytes per line
+    const BYTES_PER_LINE = 45;
+    let offset = 0;
+    
+    while (offset < binaryBuffer.length) {
+        const remainingBytes = binaryBuffer.length - offset;
+        const bytesToEncode = Math.min(remainingBytes, BYTES_PER_LINE);
+        
+        // Extract the bytes for this line
+        let lineData = binaryBuffer.slice(offset, offset + bytesToEncode);
+        const originalLength = lineData.length;
+        
+        // If this is the last line and not a multiple of 3, pad with 0x01
+        if (offset + bytesToEncode === binaryBuffer.length && originalLength % 3 !== 0) {
+            const paddingNeeded = 3 - (originalLength % 3);
+            const paddingBuffer = Buffer.alloc(paddingNeeded, 0x01);
+            lineData = Buffer.concat([lineData, paddingBuffer]);
+        }
+        
+        // Encode the length byte (original length before padding)
+        const lengthChar = String.fromCharCode((originalLength & 0x3f) + 32);
+        
+        // Encode the data
+        let encodedData = '';
+        for (let i = 0; i < lineData.length; i += 3) {
+            const b1 = i < lineData.length ? lineData[i] : 0;
+            const b2 = i + 1 < lineData.length ? lineData[i + 1] : 0;
+            const b3 = i + 2 < lineData.length ? lineData[i + 2] : 0;
+            
+            // Convert 3 bytes to 4 6-bit values
+            const c1 = (b1 >> 2) & 0x3f;
+            const c2 = ((b1 & 0x03) << 4) | ((b2 >> 4) & 0x0f);
+            const c3 = ((b2 & 0x0f) << 2) | ((b3 >> 6) & 0x03);
+            const c4 = b3 & 0x3f;
+            
+            // Convert to printable characters
+            encodedData += String.fromCharCode(c1 + 32);
+            encodedData += String.fromCharCode(c2 + 32);
+            encodedData += String.fromCharCode(c3 + 32);
+            encodedData += String.fromCharCode(c4 + 32);
+        }
+        
+        // Trim trailing spaces and add the line
+        const fullLine = lengthChar + encodedData;
+        lines.push(fullLine.trimEnd());
+        
+        offset += bytesToEncode;
+    }
+    
+    // Add end line
+    lines.push('');
+    lines.push('end');
+    
+    return lines.join('\n');
+};
+
 export const makeDisseminationFile = async function(filingMetadata, documentsBucket, documentsBucketFolder, dissemBucket, dissemFileKey) {
     try {
         // Generate SGML metadata
@@ -1175,7 +1246,8 @@ export const makeDisseminationFile = async function(filingMetadata, documentsBuc
         outputStream.on('data', chunk => chunks.push(chunk));
         
         // Process SGML lines
-        let thisFileName = null;
+        let thisFileName = null,
+            sequenceNumber = null;
         
         for (const line of sgmlLines) {
             const trimmedLine = line.trim();
@@ -1183,6 +1255,9 @@ export const makeDisseminationFile = async function(filingMetadata, documentsBuc
             // Check for <FILENAME>
             if (trimmedLine.startsWith('<FILENAME>')) {
                 thisFileName = trimmedLine.substring('<FILENAME>'.length);
+            }
+            if (trimmedLine.startsWith('<SEQUENCE>')) {
+                sequenceNumber = trimmedLine.substring('<SEQUENCE>'.length);
             }
             
             // Check for <DOCUMENT> tag
@@ -1198,7 +1273,7 @@ export const makeDisseminationFile = async function(filingMetadata, documentsBuc
                 try {
                     // Get file extension
                     const fileExtension = thisFileName.split('.').pop().toLowerCase();
-                    const isBinary = ['pdf', 'gif', 'jpg', 'png', 'xlsx', 'zip', 'xls'].includes(fileExtension);
+                    const isBinary = ['pdf', 'gif', 'jpg', 'png', 'xlsx', 'zip', 'xls', 'xlsx'].includes(fileExtension);
                     
                     // Write <TEXT> tag
                     outputStream.write('<TEXT>\n');
@@ -1207,11 +1282,12 @@ export const makeDisseminationFile = async function(filingMetadata, documentsBuc
                     const documentStream = await s3ReadStream(documentsBucket, documentKey);
                     const documentSize = await  s3ReadString(documentsBucket, documentKey);
                     if (isBinary) {
+                        let lengthCharCode, decodedBytes, expectedGroups, expectLineLength, remainingBytes, lastLine;
                         // For PDF files, write <PDF> tag before content
                         if (fileExtension === 'pdf') {
                             outputStream.write('<PDF>\n');
                         }
-                        
+
                         // Read the entire binary file into a buffer
                         const documentChunks = [];
                         for await (const chunk of documentStream) {
@@ -1219,78 +1295,16 @@ export const makeDisseminationFile = async function(filingMetadata, documentsBuc
                         }
                         const documentBuffer = Buffer.concat(documentChunks);
                         
-                        // UUEncode the binary content with header and footer
-                        outputStream.write(`begin 644 ${thisFileName}\n`);
-                        const uuencodedContent = uuencode.encode(documentBuffer);
-                        
-                        // Process UUENCODED lines to match SEC format
-                        const uuencodedLines = uuencodedContent.split('\n');
-                        
-                        // SEC adds padding to complete partial quads in the last data line
-                        // Find the last non-empty line (last data line before the terminator/blank)
-                        let lastDataLineIdx = -1;
-                        for (let i = uuencodedLines.length - 1; i >= 0; i--) {
-                            if (uuencodedLines[i].length > 0 && uuencodedLines[i][0] !== '`') {
-                                lastDataLineIdx = i;
-                                break;
-                            }
-                        }
-                        
-                        // Remove trailing spaces from all lines EXCEPT the last data line
-                        for (let i = 0; i < uuencodedLines.length; i++) {
-                            if (i !== lastDataLineIdx) {
-                                uuencodedLines[i] = uuencodedLines[i].trimEnd();
-                            }
-                        }
-                        
-                        // Process the last data line for padding
-                        if (lastDataLineIdx >= 0) {
-                            let lastLine = uuencodedLines[lastDataLineIdx];
-                            const lengthCharCode = lastLine.charCodeAt(0);
-                            const decodedBytes = (lengthCharCode - 32) & 0x3f;
-                            
-                            // Calculate how many characters should be in the encoded data
-                            const fullGroups = Math.floor(decodedBytes / 3);
-                            const remainingBytes = decodedBytes % 3;
-                            const expectedDataChars = fullGroups * 4 + (remainingBytes > 0 ? remainingBytes + 1 : 0);
-                            
-                            if (remainingBytes > 0) {
-                                // Partial group exists - SEC uses specific padding
-                                const lengthChar = lastLine[0];
-                                const dataPortion = lastLine.substring(1, 1 + expectedDataChars);
-                                
-                                // SEC padding pattern based on remaining bytes and what library produced:
-                                if (remainingBytes === 1) {
-                                    // 1 remaining byte → always append "$!"
-                                    uuencodedLines[lastDataLineIdx] = lengthChar + dataPortion + '$!';
-                                } else if (remainingBytes === 2) {
-                                    // 2 remaining bytes → check if library has trailing spaces
-                                    // If line length matches expected (no extra library padding), add "D!"
-                                    // If library added trailing spaces, replace last space with "!"
-                                    const fullLineLength = lastLine.trimEnd().length;
-                                    const expectedLineLength = 1 + expectedDataChars; // length char + data chars
-                                    
-                                    if (fullLineLength === expectedLineLength) {
-                                        // Library produced exact data chars, add "D!" padding
-                                        uuencodedLines[lastDataLineIdx] = lengthChar + dataPortion + 'D!';
-                                    } else {
-                                        // Library added trailing spaces, replace last space with "!"
-                                        uuencodedLines[lastDataLineIdx] = lengthChar + dataPortion + '!';
-                                    }
-                                }
-                            } else {
-                                // No partial group - trim trailing spaces
-                                uuencodedLines[lastDataLineIdx] = lastLine.trimEnd();
-                            }
-                        }
-                        
-                        outputStream.write(uuencodedLines.join('\n'));
-                        outputStream.write('\nend');
-                        
+                        // UUEncode using EDGAR-compatible encoding
+                        const uuencodedContent = uuEdgarEncode(documentBuffer, thisFileName);
+                        outputStream.write(uuencodedContent);
+
                         // For PDF files, write </PDF> tag after content
                         if (fileExtension === 'pdf') {
                             outputStream.write('\n</PDF>');
                         }
+                        console.log(`generated #${sequenceNumber} ${documentKey.split('.').pop()} `);
+
                     } else {
                         // For non-binary files, stream directly
                         for await (const chunk of documentStream) {
@@ -1303,6 +1317,8 @@ export const makeDisseminationFile = async function(filingMetadata, documentsBuc
                     
                 } catch (fileError) {
                     // File doesn't exist or error reading - write empty TEXT section
+                    
+                    console.log(fileError.message);
                     console.warn(`Warning: Could not read document file ${documentKey}: ${fileError.message}`);
                     outputStream.write('</TEXT>\n');
                 }
