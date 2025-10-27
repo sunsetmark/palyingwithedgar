@@ -1,4 +1,17 @@
 // Test script for common.mjs functions
+//
+// Available Tests (run with: node testCommon.mjs -<number>):
+//   1. webFetchFair - Fetch from SEC.gov
+//   2. runQuery - Execute SQL queries
+//   3. s3ReadString - Read S3 object as string
+//   4. s3ReadLine - Read S3 object as lines
+//   5. s3WriteString - Write string to S3
+//   6. fetchSubmissionMetadata - Compare metadata from file vs database
+//   7. validateXML - Validate XML files against XSD schemas
+//   8. extractXbrlFromIxbrl - Extract XBRL instances from iXBRL documents
+//   9. createSgml - Generate and compare SGML from metadata
+//  10. makeDisseminationFile - Create dissemination files and compare with originals
+//
 import { common } from '../server/common.mjs';
 
 // Parse command line arguments
@@ -401,6 +414,7 @@ if (shouldRunTest(9)) {
 }
 
 // Test 10: makeDisseminationFile - Create dissemination files and compare with originals
+// NOTE: making 2,000 dissem files and diffing took 1192 seconds 
 if (shouldRunTest(10)) {
     const start = Date.now();
     console.log('Test 10: makeDisseminationFile - Create dissemination files and compare with originals');
