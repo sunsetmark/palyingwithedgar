@@ -10,6 +10,7 @@ import uuencode from 'uuencode';
 import { promisify } from 'util';  
 import { exec } from 'child_process';
 import { fstat } from 'node:fs';
+import { config } from 'node:process';
 const execAsync = promisify(exec);
 
 // Constants
@@ -229,10 +230,12 @@ export async function processFeedFile(processInfo) {
                     await execAsync("sudo mkdir -p -m 777 ~/poc/samples/deletions/");   //write the deletions and correction to a persisted sample folder
                     const destFile = '~/poc/samples/deletions/' + processInfo.feedDate + '_' + processInfo.name;
                     fileWritePromises.push(copyFile(sourceFile, destFile));
+                    fileWritePromises.push(execAsync(`aws s3 cp ${sourceFile} s3://${processInfo.extractedFilesBucket}/samples/deletions/${processInfo.feedDate + '_' + processInfo.name}`));   //write the extracted SGML 
                 } else {
                     await execAsync("sudo mkdir -p -m 777 ~/poc/samples/corrections/");   //write the deletions and correction to a persisted sample folder
                     const destFile = '~/poc/samples/corrections/' + processInfo.feedDate + '_' + processInfo.name;
                     fileWritePromises.push(copyFile(sourceFile, destFile));
+                    fileWritePromises.push(execAsync(`aws s3 cp ${sourceFile} s3://${processInfo.extractedFilesBucket}/samples/corrections/${processInfo.feedDate + '_' + processInfo.name}`));   //write the extracted SGML feed here
                 }
             }
             // Write feeds metadata to database
@@ -553,7 +556,7 @@ export async function processFeedFile(processInfo) {
      * @param {string} filename - The filename
      * @param {string} adsh - The accession number
      */
-    function insertDependentRecords(jsonMetaData, feedDate, filename, adsh) {
+    async function insertDependentRecords(jsonMetaData, feedDate, filename, adsh) {
         try {
 
             // Process entities (filer, issuer, reporting_owner, subject_company, etc.)
@@ -570,13 +573,16 @@ export async function processFeedFile(processInfo) {
                 'underwriter': 'U'
             };
 
-            const processEntities = (entities, filerCode) => {
+            const processEntities = async (entities, filerCode) => {
                 if (!entities) return;
                 const entityArray = Array.isArray(entities) ? entities : [entities];
                 
-                entityArray.forEach((entity, index) => {
+                entityArray.forEach(async (entity, index) => {
                     const entityData = entity.company_data || entity.owner_data;
                     if (!entityData || !entityData.cik) return;
+
+                    //adding code to build out the entity and entity_history records
+                    const entityPromise = common.runQuery('POC', 'select * from entity where cik = ?', [entityData.cik]);
 
                     const filingValues = entity.filing_values || {};
                     const businessAddr = entity.business_address || {};
@@ -592,6 +598,7 @@ export async function processFeedFile(processInfo) {
                             mail_street1, mail_street2, mail_city, mail_state, mail_zip
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ON DUPLICATE KEY UPDATE
+                            cik = VALUES(cik),
                             entity_sequence = VALUES(entity_sequence),
                             conformed_name = VALUES(conformed_name),
                             organization_name = VALUES(organization_name),
@@ -615,9 +622,9 @@ export async function processFeedFile(processInfo) {
                             mail_state = VALUES(mail_state),
                             mail_zip = VALUES(mail_zip)
                     `;
-
-                    dbPromises.push(common.runQuery('POC', entityQuery, [
-                        adsh, filerCode, index, entityData.cik, entityData.conformed_name || '',
+                    const entityValues =  [
+                        adsh, filerCode, index, entityData.cik, 
+                        entityData.conformed_name || '',
                         entityData.organization_name || null,
                         entityData.irs_number || null,
                         entityData.state_of_incorporation || null,
@@ -638,26 +645,81 @@ export async function processFeedFile(processInfo) {
                         mailAddr.city || null,
                         mailAddr.state || null,
                         mailAddr.zip || null
-                    ]));
+                    ];
+                    dbPromises.push(common.runQuery('POC', entityQuery, entityValues));
 
+                    const existingEntitDataset = await entityPromise;
+                    let insertEntity = !existingEntitDataset.length;
+                    if(existingEntitDataset.length) { //entity record exists, update it if different                        const existingEntityValues = existingEntity[0];
+                        const dbEntity = existingEntitDataset[0];
+                        if(dbEntity.conformed_name != (entityData.conformed_name || '')
+                            || dbEntity.organization_name != (entityData.organization_name || null)
+                            || dbEntity.irs_number != (entityData.irs_number || null)
+                            || dbEntity.state_of_incorporation != (entityData.state_of_incorporation || null)
+                            || dbEntity.fiscal_year_end != (entityData.fiscal_year_end || null)
+                            || dbEntity.assigned_sic != (entityData.assigned_sic || null)
+                            || dbEntity.filing_form_type != (filingValues.form_type || null)
+                            || dbEntity.filing_act != (filingValues.act || null)
+                            || dbEntity.filing_file_number != (filingValues.file_number || null)
+                            || dbEntity.filing_film_number != (filingValues.film_number || null)
+                            || dbEntity.business_street1 != (businessAddr.street1 || null)
+                            || dbEntity.business_street2 != (businessAddr.street2 || null)
+                            || dbEntity.business_city != (businessAddr.city || null)
+                            || dbEntity.business_state != (businessAddr.state || null)
+                            || dbEntity.business_zip != (businessAddr.zip || null)
+                            || dbEntity.business_phone != (businessAddr.phone || null)
+                            || dbEntity.mail_street1 != (mailAddr.street1 || null)
+                            || dbEntity.mail_street2 != (mailAddr.street2 || null)
+                            || dbEntity.mail_city != (mailAddr.city || null)
+                            || dbEntity.mail_state != (mailAddr.state || null)
+                            || dbEntity.mail_zip != (mailAddr.zip || null)) {
+                                const deleteEntity = common.runQuery('POC', 'delete from entity where cik = ?', [entityData.cik]);
+                                //const deleteEntityHistory = common.runQuery('POC', 'delete from entity_history where cik = ?', [entityData.cik]); //no cascade delete from entity = more control
+                                await deleteEntity;
+                                //await deleteEntityHistory;
+                                insertEntity = true;
+                        }
+                    }
+                    
+                    if(insertEntity) {
+                        dbPromises.push(common.runQuery('POC', 
+                            `INSERT IGNORE INTO entity (
+                            cik, conformed_name, organization_name,
+                            irs_number, state_of_incorporation, fiscal_year_end, assigned_sic,
+                            filing_form_type, filing_act, filing_file_number, filing_film_number,
+                            business_street1, business_street2, business_city, business_state,
+                            business_zip, business_phone,
+                            mail_street1, mail_street2, mail_city, mail_state, mail_zip
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) `, 
+                        entityValues.slice(3)));
+                    }
                     // Process former_company array
                     function processFormerCompany(formerNamesArray) {
-                        if (formerNamesArray && Array.isArray(formerNamesArray)) {
-                            formerNamesArray.forEach((former, formerIndex) => {
+                        if (formerNamesArray && Array.isArray(formerNamesArray) && formerNamesArray.length) {
+                            const formerCompanyQuery = `INSERT INTO submission_former_name 
+                                (adsh, cik, former_conformed_name, date_changed, former_name_sequence)
+                                VALUES (?, ?, ?, ?, ?)
+                                ON DUPLICATE KEY UPDATE 
+                                former_conformed_name = VALUES(former_conformed_name),
+                                date_changed = VALUES(date_changed)`;
+                            const entityHistoryQuery = `INSERT IGNORE INTO entity_history 
+                                (cik, conformed_name, date_changed)
+                                VALUES (?, ?, ?)`;
+                            for(let i=formerNamesArray.length-1; i>=0; i--) {
+                                const former = formerNamesArray[i];
+                                const sequence = i+1;
                                 if (former.former_conformed_name && former.date_changed) {
-                                    const formerCompanyQuery = `
-                                        INSERT INTO submission_former_name (adsh, cik, former_conformed_name, date_changed, former_name_sequence)
-                                        VALUES (?, ?, ?, ?, ?)
-                                        ON DUPLICATE KEY UPDATE 
-                                        former_conformed_name = VALUES(former_conformed_name),
-                                        date_changed = VALUES(date_changed),
-                                        former_name_sequence = VALUES(former_name_sequence)
-                                    `;
+                                    
                                     dbPromises.push(common.runQuery('POC', formerCompanyQuery, [
-                                        adsh, entityData.cik, former.former_conformed_name, former.date_changed, formerIndex
+                                        adsh, entityData.cik, former.former_conformed_name, former.date_changed, sequence
                                     ]));
+                                    if(insertEntity) {
+                                        dbPromises.push(common.runQuery('POC', entityHistoryQuery, [
+                                            entityData.cik, former.former_conformed_name, former.date_changed
+                                        ]));
+                                    }
                                 }
-                            });
+                            }
                         }
                     }
                     processFormerCompany(entity.former_company);
@@ -668,7 +730,7 @@ export async function processFeedFile(processInfo) {
             // Process all entity types
             for (const [entityType, filerCode] of Object.entries(associatedEntityTypes)) {
                 if (jsonMetaData[entityType]) {
-                    processEntities(jsonMetaData[entityType], filerCode);
+                    await processEntities(jsonMetaData[entityType], filerCode);
                 }
             }
 

@@ -1,0 +1,33 @@
+{
+  "name": "edgaronline-api",
+  "version": "1.0.0",
+  "description": "SEC Ownership Filing System - Backend API",
+  "type": "module",
+  "main": "src/server.mjs",
+  "scripts": {
+    "dev": "nodemon src/server.mjs",
+    "start": "node src/server.mjs",
+    "migrate": "node migrations/run.mjs"
+  },
+  "keywords": ["SEC", "EDGAR", "filing", "API"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.21.1",
+    "cors": "^2.8.5",
+    "helmet": "^8.0.0",
+    "express-rate-limit": "^7.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
+    "multer": "^1.4.5-lts.1",
+    "dotenv": "^16.4.7",
+    "mysql2": "^3.14.5",
+    "@aws-sdk/client-s3": "^3.886.0",
+    "validate-with-xmllint": "^1.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}
+
+

@@ -1,0 +1,1290 @@
+[
+  {
+    "path": "XML",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "0-0",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > aff10b5One",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > dateOfOriginalSubmission",
+    "formTypes": ["3/A","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-15",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > conversionOrExercisePrice",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > conversionOrExercisePrice > footnoteId",
+    "formTypes": ["3","4","4/A"],
+    "attributes": ["id"],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > conversionOrExercisePrice > value",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > exerciseDate",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > exerciseDate > footnoteId",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": ["id"],
+    "occurancesRange": "1-2",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > exerciseDate > value",
+    "formTypes": ["3","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > expirationDate",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > expirationDate > footnoteId",
+    "formTypes": ["3","4","4/A"],
+    "attributes": ["id"],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > expirationDate > value",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > ownershipNature",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > ownershipNature > directOrIndirectOwnership",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > ownershipNature > directOrIndirectOwnership > value",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > ownershipNature > natureOfOwnership",
+    "formTypes": ["3","4"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > ownershipNature > natureOfOwnership > footnoteId",
+    "formTypes": ["3","4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-3",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > ownershipNature > natureOfOwnership > value",
+    "formTypes": ["3","4"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > postTransactionAmounts",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > postTransactionAmounts > sharesOwnedFollowingTransaction",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > postTransactionAmounts > sharesOwnedFollowingTransaction > footnoteId",
+    "formTypes": ["4","4/A"],
+    "attributes": ["id"],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > postTransactionAmounts > sharesOwnedFollowingTransaction > value",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > securityTitle",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > securityTitle > footnoteId",
+    "formTypes": ["3","4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > securityTitle > value",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > transactionCoding",
+    "formTypes": ["5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > underlyingSecurity",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > underlyingSecurity > underlyingSecurityShares",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > underlyingSecurity > underlyingSecurityShares > footnoteId",
+    "formTypes": ["3","4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > underlyingSecurity > underlyingSecurityShares > value",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > underlyingSecurity > underlyingSecurityTitle",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeHolding > underlyingSecurity > underlyingSecurityTitle > value",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-6",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > conversionOrExercisePrice",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > conversionOrExercisePrice > footnoteId",
+    "formTypes": ["4","4/A"],
+    "attributes": ["id"],
+    "occurancesRange": "1-2",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > conversionOrExercisePrice > value",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > deemedExecutionDate",
+    "formTypes": ["4"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > deemedExecutionDate > value",
+    "formTypes": ["4"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > exerciseDate",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > exerciseDate > footnoteId",
+    "formTypes": ["4","4/A"],
+    "attributes": ["id"],
+    "occurancesRange": "1-3",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > exerciseDate > value",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > expirationDate",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > expirationDate > footnoteId",
+    "formTypes": ["4","4/A"],
+    "attributes": ["id"],
+    "occurancesRange": "1-3",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > expirationDate > value",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > ownershipNature",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > ownershipNature > directOrIndirectOwnership",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > ownershipNature > directOrIndirectOwnership > footnoteId",
+    "formTypes": ["4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > ownershipNature > directOrIndirectOwnership > value",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > ownershipNature > natureOfOwnership",
+    "formTypes": ["4"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > ownershipNature > natureOfOwnership > footnoteId",
+    "formTypes": ["4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-5",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > ownershipNature > natureOfOwnership > value",
+    "formTypes": ["4"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > postTransactionAmounts",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > postTransactionAmounts > sharesOwnedFollowingTransaction",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > postTransactionAmounts > sharesOwnedFollowingTransaction > footnoteId",
+    "formTypes": ["4","4/A"],
+    "attributes": ["id"],
+    "occurancesRange": "1-2",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > postTransactionAmounts > sharesOwnedFollowingTransaction > value",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > postTransactionAmounts > valueOwnedFollowingTransaction",
+    "formTypes": ["4"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > postTransactionAmounts > valueOwnedFollowingTransaction > footnoteId",
+    "formTypes": ["4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > postTransactionAmounts > valueOwnedFollowingTransaction > value",
+    "formTypes": ["4"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > securityTitle",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > securityTitle > footnoteId",
+    "formTypes": ["4","4/A"],
+    "attributes": ["id"],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > securityTitle > value",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionAmounts",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionAmounts > transactionAcquiredDisposedCode",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionAmounts > transactionAcquiredDisposedCode > value",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionAmounts > transactionPricePerShare",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionAmounts > transactionPricePerShare > footnoteId",
+    "formTypes": ["4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-2",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionAmounts > transactionPricePerShare > value",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionAmounts > transactionShares",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionAmounts > transactionShares > footnoteId",
+    "formTypes": ["4","4/A"],
+    "attributes": ["id"],
+    "occurancesRange": "1-2",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionAmounts > transactionShares > value",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionAmounts > transactionTotalValue",
+    "formTypes": ["4"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionAmounts > transactionTotalValue > footnoteId",
+    "formTypes": ["4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionAmounts > transactionTotalValue > value",
+    "formTypes": ["4"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionCoding",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionCoding > equitySwapInvolved",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionCoding > footnoteId",
+    "formTypes": ["4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-3",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionCoding > transactionCode",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionCoding > transactionFormType",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionDate",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionDate > footnoteId",
+    "formTypes": ["4","4/A"],
+    "attributes": ["id"],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionDate > value",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionTimeliness",
+    "formTypes": ["4"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > transactionTimeliness > value",
+    "formTypes": ["4"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > underlyingSecurity",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > underlyingSecurity > underlyingSecurityShares",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > underlyingSecurity > underlyingSecurityShares > footnoteId",
+    "formTypes": ["4","4/A"],
+    "attributes": ["id"],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > underlyingSecurity > underlyingSecurityShares > value",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > underlyingSecurity > underlyingSecurityTitle",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > underlyingSecurity > underlyingSecurityTitle > footnoteId",
+    "formTypes": ["4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > underlyingSecurity > underlyingSecurityTitle > value",
+    "formTypes": ["4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > underlyingSecurity > underlyingSecurityValue",
+    "formTypes": ["4"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > underlyingSecurity > underlyingSecurityValue > footnoteId",
+    "formTypes": ["4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > derivativeTable > derivativeTransaction > underlyingSecurity > underlyingSecurityValue > value",
+    "formTypes": ["4"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > documentType",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > footnotes",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > footnotes > footnote",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": ["id"],
+    "occurancesRange": "1-15",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > form3HoldingsReported",
+    "formTypes": ["5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > form4TransactionsReported",
+    "formTypes": ["5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > issuer",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > issuer > issuerCik",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > issuer > issuerName",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > issuer > issuerTradingSymbol",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable",
+    "formTypes": ["3","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeHolding",
+    "formTypes": ["3","4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-9",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeHolding > ownershipNature",
+    "formTypes": ["3","4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeHolding > ownershipNature > directOrIndirectOwnership",
+    "formTypes": ["3","4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeHolding > ownershipNature > directOrIndirectOwnership > footnoteId",
+    "formTypes": ["3","4","4/A"],
+    "attributes": ["id"],
+    "occurancesRange": "1-3",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeHolding > ownershipNature > directOrIndirectOwnership > value",
+    "formTypes": ["3","4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeHolding > ownershipNature > natureOfOwnership",
+    "formTypes": ["3","4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeHolding > ownershipNature > natureOfOwnership > footnoteId",
+    "formTypes": ["3","4","4/A"],
+    "attributes": ["id"],
+    "occurancesRange": "1-4",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeHolding > ownershipNature > natureOfOwnership > value",
+    "formTypes": ["3","4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeHolding > postTransactionAmounts",
+    "formTypes": ["3","4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeHolding > postTransactionAmounts > sharesOwnedFollowingTransaction",
+    "formTypes": ["3","4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeHolding > postTransactionAmounts > sharesOwnedFollowingTransaction > footnoteId",
+    "formTypes": ["3","4","4/A"],
+    "attributes": ["id"],
+    "occurancesRange": "1-4",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeHolding > postTransactionAmounts > sharesOwnedFollowingTransaction > value",
+    "formTypes": ["3","4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeHolding > securityTitle",
+    "formTypes": ["3","4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeHolding > securityTitle > footnoteId",
+    "formTypes": ["4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeHolding > securityTitle > value",
+    "formTypes": ["3","4","4/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-20",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > deemedExecutionDate",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > deemedExecutionDate > value",
+    "formTypes": ["4","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > ownershipNature",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > ownershipNature > directOrIndirectOwnership",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > ownershipNature > directOrIndirectOwnership > footnoteId",
+    "formTypes": ["4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-2",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > ownershipNature > directOrIndirectOwnership > value",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > ownershipNature > natureOfOwnership",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > ownershipNature > natureOfOwnership > footnoteId",
+    "formTypes": ["4","4/A","5"],
+    "attributes": ["id"],
+    "occurancesRange": "1-8",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > ownershipNature > natureOfOwnership > value",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > postTransactionAmounts",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > postTransactionAmounts > sharesOwnedFollowingTransaction",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > postTransactionAmounts > sharesOwnedFollowingTransaction > footnoteId",
+    "formTypes": ["4","4/A","5"],
+    "attributes": ["id"],
+    "occurancesRange": "1-2",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > postTransactionAmounts > sharesOwnedFollowingTransaction > value",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > securityTitle",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > securityTitle > footnoteId",
+    "formTypes": ["4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-2",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > securityTitle > value",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionAmounts",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionAmounts > transactionAcquiredDisposedCode",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionAmounts > transactionAcquiredDisposedCode > footnoteId",
+    "formTypes": ["4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionAmounts > transactionAcquiredDisposedCode > value",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionAmounts > transactionPricePerShare",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionAmounts > transactionPricePerShare > footnoteId",
+    "formTypes": ["4","4/A","5"],
+    "attributes": ["id"],
+    "occurancesRange": "1-3",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionAmounts > transactionPricePerShare > value",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionAmounts > transactionShares",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionAmounts > transactionShares > footnoteId",
+    "formTypes": ["4","4/A"],
+    "attributes": ["id"],
+    "occurancesRange": "1-2",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionAmounts > transactionShares > value",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionCoding",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionCoding > equitySwapInvolved",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionCoding > footnoteId",
+    "formTypes": ["4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-2",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionCoding > transactionCode",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionCoding > transactionFormType",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionDate",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionDate > footnoteId",
+    "formTypes": ["4"],
+    "attributes": ["id"],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionDate > value",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionTimeliness",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > nonDerivativeTable > nonDerivativeTransaction > transactionTimeliness > value",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > noSecuritiesOwned",
+    "formTypes": ["3","3/A"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > notSubjectToSection16",
+    "formTypes": ["4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > ownerSignature",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-10",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > ownerSignature > signatureDate",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > ownerSignature > signatureName",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > periodOfReport",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > remarks",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-10",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerAddress",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerAddress > rptOwnerCity",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerAddress > rptOwnerState",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerAddress > rptOwnerStateDescription",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerAddress > rptOwnerStreet1",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerAddress > rptOwnerStreet2",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerAddress > rptOwnerZipCode",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerId",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerId > rptOwnerCik",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerId > rptOwnerName",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerRelationship",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": false
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerRelationship > isDirector",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerRelationship > isOfficer",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerRelationship > isOther",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerRelationship > isTenPercentOwner",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerRelationship > officerTitle",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > reportingOwner > reportingOwnerRelationship > otherText",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  },
+  {
+    "path": "XML > ownershipDocument > schemaVersion",
+    "formTypes": ["3","3/A","4","4/A","5"],
+    "attributes": [],
+    "occurancesRange": "1-1",
+    "isDataElement": true
+  }
+]

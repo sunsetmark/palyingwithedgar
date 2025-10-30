@@ -667,6 +667,89 @@ INSERT INTO form_type_ref (form_type, name, description, activated, deprecated) 
 ('SD', 'Specialized disclosure report', 'Disclosure report', NULL, NULL),
 ('T-3', 'Application for qualification of indentures', 'Indenture application', NULL, NULL);
 
+
+
+
+-- ============================================================================
+-- ENTITY TABLES
+-- ============================================================================
+--DROP dependent tables first due to FK constraints:
+DROP TABLE IF EXISTS entity_history;
+DROP TABLE IF EXISTS entity;
+-- ----------------------------------------------------------------------------
+-- entity: Current entity info; COUPDAT updates copy record to entity_history before updating  
+-- ----------------------------------------------------------------------------
+--moved above the DROP filer_type_ref statement due to FK constraint: DROP TABLE IF EXISTS submission_entity;
+CREATE TABLE entity (
+    cik BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+    conformed_name VARCHAR(255) NOT NULL,
+    organization_name VARCHAR(255) DEFAULT NULL,
+    irs_number VARCHAR(20) DEFAULT NULL,
+    state_of_incorporation VARCHAR(2) DEFAULT NULL,
+    fiscal_year_end VARCHAR(4) DEFAULT NULL COMMENT 'MMDD format',
+    assigned_sic VARCHAR(4) DEFAULT NULL,
+    -- Filing values
+    filing_form_type VARCHAR(20) DEFAULT NULL,
+    filing_act VARCHAR(10) DEFAULT NULL,
+    filing_file_number VARCHAR(20) DEFAULT NULL,
+    filing_film_number VARCHAR(20) DEFAULT NULL,
+    -- Business address
+    business_street1 VARCHAR(255) DEFAULT NULL,
+    business_street2 VARCHAR(255) DEFAULT NULL,
+    business_city VARCHAR(100) DEFAULT NULL,
+    business_state VARCHAR(2) DEFAULT NULL,
+    business_zip VARCHAR(20) DEFAULT NULL,
+    business_phone VARCHAR(20) DEFAULT NULL,
+    -- Mail address
+    mail_street1 VARCHAR(255) DEFAULT NULL,
+    mail_street2 VARCHAR(255) DEFAULT NULL,
+    mail_city VARCHAR(100) DEFAULT NULL,
+    mail_state VARCHAR(2) DEFAULT NULL,
+    mail_zip VARCHAR(20) DEFAULT NULL,
+    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------------------------
+-- entity_history: Contiain entity change history from COUPDAT updates.  Used for audit and for <FORMER-COMPANY> in dssiminations  
+-- ----------------------------------------------------------------------------
+--moved above the DROP filer_type_ref statement due to FK constraint: DROP TABLE IF EXISTS submission_entity;
+CREATE TABLE entity_history (
+    -- Change order (multiple changes allowed on same date)
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    date_changed char(8) NOT NULL COMMENT 'YYYYMMDD format',
+    -- Entity values
+    cik BIGINT UNSIGNED NOT NULL,
+    conformed_name VARCHAR(255) NOT NULL,
+    organization_name VARCHAR(255) DEFAULT NULL,
+    irs_number VARCHAR(20) DEFAULT NULL,
+    state_of_incorporation VARCHAR(2) DEFAULT NULL,
+    fiscal_year_end VARCHAR(4) DEFAULT NULL COMMENT 'MMDD format',
+    assigned_sic VARCHAR(4) DEFAULT NULL,
+    -- Filing values
+    filing_form_type VARCHAR(20) DEFAULT NULL,
+    filing_act VARCHAR(10) DEFAULT NULL,
+    filing_file_number VARCHAR(20) DEFAULT NULL,
+    filing_film_number VARCHAR(20) DEFAULT NULL,
+    -- Business address
+    business_street1 VARCHAR(255) DEFAULT NULL,
+    business_street2 VARCHAR(255) DEFAULT NULL,
+    business_city VARCHAR(100) DEFAULT NULL,
+    business_state VARCHAR(2) DEFAULT NULL,
+    business_zip VARCHAR(20) DEFAULT NULL,
+    business_phone VARCHAR(20) DEFAULT NULL,
+    -- Mail address
+    mail_street1 VARCHAR(255) DEFAULT NULL,
+    mail_street2 VARCHAR(255) DEFAULT NULL,
+    mail_city VARCHAR(100) DEFAULT NULL,
+    mail_state VARCHAR(2) DEFAULT NULL,
+    mail_zip VARCHAR(20) DEFAULT NULL,
+    created DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    modified DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_cik (cik),
+    FOREIGN KEY (cik) REFERENCES entity(cik) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ============================================================================
 -- SUBMISSION TABLES
 -- ============================================================================
@@ -751,7 +834,7 @@ CREATE TABLE submission_entity (
     adsh VARCHAR(20) NOT NULL,
     filer_code CHAR(2) NOT NULL COMMENT 'Entity type: F, RO, I, SC, D, S, FF, IE, FB, U',
     entity_sequence SMALLINT UNSIGNED NOT NULL COMMENT 'Preserves array order from original filing',
-    cik VARCHAR(10) NOT NULL,
+    cik BIGINT UNSIGNED NOT NULL,
     conformed_name VARCHAR(255) NOT NULL,
     organization_name VARCHAR(255) DEFAULT NULL,
     irs_number VARCHAR(20) DEFAULT NULL,
@@ -964,52 +1047,148 @@ CREATE TABLE submission_rule_item (
     FOREIGN KEY (adsh) REFERENCES submission_rule(adsh) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================================
--- ALTER STATEMENTS FOR SCHEMA UPDATES
--- ============================================================================
--- Add sequence columns (run manually if upgrading existing database)
--- ALTER TABLE submission_entity ADD COLUMN entity_sequence INT NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing' AFTER filer_code;
--- ALTER TABLE submission_former_name ADD COLUMN former_name_sequence INT NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing' AFTER date_changed;
--- ALTER TABLE submission_references_429 ADD COLUMN reference_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing' AFTER reference_429;
--- ALTER TABLE submission_group_members ADD COLUMN group_member_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing' AFTER group_member;
--- Note: submission_merger table removed - merger_sequence now tracked directly in submission_merger_series
--- ALTER TABLE submission_target_data ADD COLUMN target_sequence SMALLINT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Preserves array order from original filing' AFTER adsh;
+-- tables for EDGAR Online filing system
+-- Date: 2025-01-29
 
--- Drop item_sequence column if it exists (items are naturally ordered by item_code)
--- ALTER TABLE submission_item DROP COLUMN item_sequence;
+--drop dependent tables first due to FK constraints:
 
--- Add series_source column and remove is_new from submission_series (run manually if upgrading existing database)
--- ALTER TABLE submission_series ADD COLUMN series_source ENUM('new_series', 'new_classes_contracts', 'existing_series') NOT NULL DEFAULT 'new_series' COMMENT 'Source property name from original filing' AFTER series_name;
--- ALTER TABLE submission_series DROP COLUMN is_new;
+DROP TABLE IF EXISTS edgar_submissions;
+DROP TABLE IF EXISTS validation_logs;
+DROP TABLE IF EXISTS user_sessions;
+DROP TABLE IF EXISTS audit_log;
+DROP TABLE IF EXISTS exhibit_files;
+DROP TABLE IF EXISTS filing_drafts;
+-- User management table
+DROP TABLE IF EXISTS users;
+CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(255),
+    cik BIGINT UNSIGNED NOT NULL,
+    ccc_encrypted VARBINARY(255) COMMENT 'Encrypted CCC - NEVER store plain text',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    last_login TIMESTAMP NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    INDEX idx_email (email),
+    INDEX idx_cik (cik)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='User accounts for filing system';
 
--- Add new fields to submission table (run manually if upgrading existing database)
--- ALTER TABLE submission ADD COLUMN period_start VARCHAR(8) DEFAULT NULL COMMENT 'Period start date YYYYMMDD' AFTER period;
--- ALTER TABLE submission ADD COLUMN received_date VARCHAR(8) DEFAULT NULL COMMENT 'Received date YYYYMMDD' AFTER acceptance_datetime;
--- ALTER TABLE submission ADD COLUMN action_date VARCHAR(8) DEFAULT NULL COMMENT 'Action date YYYYMMDD' AFTER received_date;
--- ALTER TABLE submission ADD COLUMN public_rel_date VARCHAR(8) DEFAULT NULL COMMENT 'Public release date YYYYMMDD' AFTER action_date;
--- ALTER TABLE submission ADD COLUMN ma_i_individual VARCHAR(255) DEFAULT NULL COMMENT 'MA-I individual name' AFTER is_paper;
--- ALTER TABLE submission ADD COLUMN previous_accession_number VARCHAR(20) DEFAULT NULL COMMENT 'Previous accession number for amendments' AFTER ma_i_individual;
--- ALTER TABLE submission ADD COLUMN withdrawn_accession_number VARCHAR(20) DEFAULT NULL COMMENT 'Withdrawn accession number' AFTER previous_accession_number;
--- ALTER TABLE submission ADD COLUMN public_reference_acc VARCHAR(20) DEFAULT NULL COMMENT 'Public reference accession' AFTER withdrawn_accession_number;
--- ALTER TABLE submission ADD COLUMN reference_462b VARCHAR(20) DEFAULT NULL COMMENT '462(b) reference' AFTER public_reference_acc;
--- ALTER TABLE submission ADD COLUMN confirming_copy CHAR(1) DEFAULT NULL COMMENT 'Confirming copy flag' AFTER reference_462b;
--- ALTER TABLE submission ADD COLUMN private_to_public CHAR(1) DEFAULT NULL COMMENT 'Private to public flag' AFTER confirming_copy;
--- ALTER TABLE submission ADD COLUMN abs_asset_class VARCHAR(50) DEFAULT NULL COMMENT 'ABS asset class' AFTER private_to_public;
--- ALTER TABLE submission ADD COLUMN abs_sub_asset_class VARCHAR(50) DEFAULT NULL COMMENT 'ABS sub asset class' AFTER abs_asset_class;
--- ALTER TABLE submission ADD COLUMN is_filer_a_new_registrant CHAR(1) DEFAULT NULL COMMENT 'New registrant flag' AFTER abs_sub_asset_class;
--- ALTER TABLE submission ADD COLUMN is_filer_a_well_known_seasoned_issuer CHAR(1) DEFAULT NULL COMMENT 'Well-known seasoned issuer flag' AFTER is_filer_a_new_registrant;
--- ALTER TABLE submission ADD COLUMN is_fund_24f2_eligible CHAR(1) DEFAULT NULL COMMENT 'Fund 24F-2 eligible flag' AFTER is_filer_a_well_known_seasoned_issuer;
--- ALTER TABLE submission ADD COLUMN filed_pursuant_to_general_instruction_a2 CHAR(1) DEFAULT NULL COMMENT 'Filed pursuant to General Instruction A.2' AFTER is_fund_24f2_eligible;
--- ALTER TABLE submission ADD COLUMN registered_entity CHAR(1) DEFAULT NULL COMMENT 'Registered entity flag' AFTER filed_pursuant_to_general_instruction_a2;
--- ALTER TABLE submission ADD COLUMN no_annual_activity CHAR(1) DEFAULT NULL COMMENT 'No annual activity flag' AFTER registered_entity;
--- ALTER TABLE submission ADD COLUMN no_initial_period_activity CHAR(1) DEFAULT NULL COMMENT 'No initial period activity flag' AFTER no_annual_activity;
--- ALTER TABLE submission ADD COLUMN no_quarterly_activity CHAR(1) DEFAULT NULL COMMENT 'No quarterly activity flag' AFTER no_initial_period_activity;
--- ALTER TABLE submission ADD COLUMN category VARCHAR(50) DEFAULT NULL COMMENT 'Category' AFTER no_quarterly_activity;
--- ALTER TABLE submission ADD COLUMN calendar_year_ending VARCHAR(4) DEFAULT NULL COMMENT 'Calendar year ending MMDD' AFTER category;
--- ALTER TABLE submission ADD COLUMN depositor_cik VARCHAR(10) DEFAULT NULL COMMENT 'Depositor CIK' AFTER calendar_year_ending;
--- ALTER TABLE submission ADD COLUMN sponsor_cik VARCHAR(10) DEFAULT NULL COMMENT 'Sponsor CIK' AFTER depositor_cik;
--- ALTER TABLE submission ADD COLUMN resource_ext_issuer VARCHAR(10) DEFAULT NULL COMMENT 'Resource external issuer' AFTER sponsor_cik;
--- ALTER TABLE submission ADD COLUMN timestamp VARCHAR(14) DEFAULT NULL COMMENT 'Timestamp YYYYMMDDHHmmss' AFTER resource_ext_issuer;
+INSERT INTO users (email, password_hash, name, cik, is_active) VALUES
+('demo@example.com', '$2a$10$gf/yhFIeyz200Upz41bVDersiLpA5u4CkQLjywtoL/LQmiBUbrACW', 'Demo User', 0001234567, true);
+
+-- Filing drafts (work in progress)
+CREATE TABLE IF NOT EXISTS filing_drafts (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    form_type ENUM('3','3/A','4','4/A','5','5/A') NOT NULL,
+    draft_name VARCHAR(255),
+    xml_content LONGTEXT COMMENT 'Generated XML',
+    json_data JSON COMMENT 'Form state for UI',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_form_type (form_type),
+    INDEX idx_updated_at (updated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Draft filings in progress';
+
+-- Reporter cache (from SEC lookups)
+DROP TABLE IF EXISTS reporters_cache;
+CREATE TABLE IF NOT EXISTS reporters_cache (
+    cik BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+    name VARCHAR(150),
+    address_street1 VARCHAR(100),
+    address_street2 VARCHAR(100),
+    address_city VARCHAR(50),
+    address_state CHAR(2),
+    address_zip VARCHAR(10),
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Cached reporter information from SEC';
+
+-- Validation logs
+CREATE TABLE IF NOT EXISTS validation_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    filing_draft_id INT,
+    validation_type ENUM('schema','business','edgar','full') NOT NULL,
+    is_valid BOOLEAN NOT NULL,
+    errors JSON COMMENT 'Array of error messages',
+    warnings JSON COMMENT 'Array of warning messages',
+    validated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (filing_draft_id) REFERENCES filing_drafts(id) ON DELETE CASCADE,
+    INDEX idx_filing_draft_id (filing_draft_id),
+    INDEX idx_validation_type (validation_type),
+    INDEX idx_validated_at (validated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Validation history for filings';
+
+-- EDGAR submission tracking
+CREATE TABLE IF NOT EXISTS edgar_submissions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    filing_draft_id INT,
+    user_id INT NOT NULL,
+    accession_number CHAR(20),
+    form_type varchar(30) NOT NULL,
+    status ENUM('pending','submitted','accepted','suspended','blocked') DEFAULT 'pending',
+    is_live BOOLEAN DEFAULT FALSE COMMENT 'TRUE if submitted to live EDGAR, FALSE for test',
+    edgar_response TEXT COMMENT 'Response from EDGAR system',
+    submitted_at TIMESTAMP NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (filing_draft_id) REFERENCES filing_drafts(id) ON DELETE SET NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_accession_number (accession_number),
+    INDEX idx_status (status),
+    INDEX idx_submitted_at (submitted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='EDGAR submission tracking';
+
+-- Exhibit files
+CREATE TABLE IF NOT EXISTS exhibit_files (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    filing_draft_id INT NOT NULL,
+    filename VARCHAR(255) NOT NULL,
+    s3_key VARCHAR(500) NOT NULL COMMENT 'S3 object key',
+    file_size INT NOT NULL COMMENT 'Size in bytes',
+    content_type VARCHAR(100),
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (filing_draft_id) REFERENCES filing_drafts(id) ON DELETE CASCADE,
+    INDEX idx_filing_draft_id (filing_draft_id),
+    INDEX idx_s3_key (s3_key(255))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Exhibit file metadata';
+
+-- Session management (optional - if not using JWT only)
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    token_hash VARCHAR(255) NOT NULL,
+    ip_address VARCHAR(45),
+    user_agent VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_token_hash (token_hash),
+    INDEX idx_expires_at (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Active user sessions';
+
+-- Audit log for important actions
+CREATE TABLE IF NOT EXISTS audit_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT,
+    action VARCHAR(100) NOT NULL,
+    resource_type VARCHAR(50),
+    resource_id INT,
+    details JSON,
+    ip_address VARCHAR(45),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_user_id (user_id),
+    INDEX idx_action (action),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Audit trail for security and compliance';
+
+
 
 -- ============================================================================
 -- TRIGGERS FOR MODIFIED TIMESTAMPS

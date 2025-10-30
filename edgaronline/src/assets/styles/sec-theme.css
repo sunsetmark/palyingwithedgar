@@ -1,0 +1,245 @@
+/**
+ * SEC.gov Theme for EDGAR Online Filing System
+ * Based on official SEC.gov color scheme and branding
+ */
+
+:root {
+  /* SEC Official Colors */
+  --sec-blue-primary: #004990;      /* Primary SEC blue */
+  --sec-blue-dark: #162e51;          /* Dark blue for headers */
+  --sec-blue-light: #0071bc;         /* Light blue for links/accents */
+  --sec-blue-lighter: #e1f3f8;       /* Very light blue for backgrounds */
+  
+  --sec-red-accent: #d63e04;         /* Red/orange for alerts */
+  --sec-gold-accent: #ffbe2e;        /* Gold accent */
+  
+  /* Neutrals */
+  --sec-text-primary: #212121;       /* Primary text */
+  --sec-text-secondary: #5b616b;     /* Secondary text */
+  --sec-gray-light: #f0f0f0;         /* Light gray backgrounds */
+  --sec-gray-medium: #dfe1e2;        /* Medium gray borders */
+  --sec-gray-dark: #71767a;          /* Dark gray */
+  
+  --sec-white: #ffffff;
+  --sec-black: #000000;
+  
+  /* Success/Warning/Error */
+  --sec-success: #00a91c;
+  --sec-warning: #ffbe2e;
+  --sec-error: #d63e04;
+  --sec-info: #0071bc;
+}
+
+/* Override USWDS colors with SEC theme */
+.usa-header {
+  background-color: var(--sec-blue-dark);
+}
+
+.usa-logo {
+  color: var(--sec-white);
+}
+
+.usa-nav__primary > .usa-nav__primary-item > a {
+  color: var(--sec-white);
+}
+
+.usa-nav__primary > .usa-nav__primary-item > a:hover {
+  color: var(--sec-gold-accent);
+}
+
+/* Primary buttons with SEC blue */
+.usa-button,
+.usa-button--primary {
+  background-color: var(--sec-blue-primary);
+}
+
+.usa-button:hover,
+.usa-button--primary:hover {
+  background-color: var(--sec-blue-dark);
+}
+
+/* Secondary buttons */
+.usa-button--secondary {
+  background-color: var(--sec-white);
+  color: var(--sec-blue-primary);
+  border: 2px solid var(--sec-blue-primary);
+}
+
+.usa-button--secondary:hover {
+  background-color: var(--sec-blue-lighter);
+  color: var(--sec-blue-dark);
+}
+
+/* Links */
+.usa-link,
+a {
+  color: var(--sec-blue-light);
+}
+
+.usa-link:hover,
+a:hover {
+  color: var(--sec-blue-dark);
+}
+
+/* Alerts */
+.usa-alert--success {
+  border-left-color: var(--sec-success);
+}
+
+.usa-alert--warning {
+  border-left-color: var(--sec-warning);
+}
+
+.usa-alert--error {
+  border-left-color: var(--sec-error);
+}
+
+.usa-alert--info {
+  border-left-color: var(--sec-info);
+}
+
+/* Hero/Banner styling */
+.sec-hero {
+  background: linear-gradient(135deg, var(--sec-blue-dark) 0%, var(--sec-blue-primary) 100%);
+  color: var(--sec-white);
+  padding: 4rem 0;
+}
+
+.sec-hero h1 {
+  color: var(--sec-white);
+  margin-bottom: 1rem;
+}
+
+/* Footer styling */
+.usa-footer {
+  background-color: var(--sec-blue-dark);
+  color: var(--sec-white);
+}
+
+.usa-footer a {
+  color: var(--sec-white);
+}
+
+.usa-footer a:hover {
+  color: var(--sec-gold-accent);
+}
+
+/* Form styling */
+.usa-form-group {
+  margin-bottom: 1.5rem;
+}
+
+.usa-input:focus,
+.usa-textarea:focus,
+.usa-select:focus {
+  outline: 0.25rem solid var(--sec-blue-light);
+  outline-offset: 0;
+}
+
+/* Card components */
+.sec-card {
+  border: 1px solid var(--sec-gray-medium);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  background-color: var(--sec-white);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sec-card:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* SEC Logo styling */
+.sec-logo {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.sec-logo-text {
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--sec-white);
+}
+
+/* Navigation breadcrumbs */
+.usa-breadcrumb__list-item a {
+  color: var(--sec-blue-light);
+}
+
+/* Tables */
+.usa-table th {
+  background-color: var(--sec-blue-dark);
+  color: var(--sec-white);
+}
+
+.usa-table tbody tr:nth-child(even) {
+  background-color: var(--sec-gray-light);
+}
+
+/* Step indicator for filing wizard */
+.usa-step-indicator__segment--current {
+  background-color: var(--sec-blue-primary);
+}
+
+.usa-step-indicator__segment--complete::after {
+  background-color: var(--sec-success);
+}
+
+/* Validation error styling */
+.validation-error {
+  color: var(--sec-error);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.validation-success {
+  color: var(--sec-success);
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+/* Loading spinner */
+.sec-spinner {
+  border: 4px solid var(--sec-gray-light);
+  border-top: 4px solid var(--sec-blue-primary);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Utility classes */
+.sec-text-primary {
+  color: var(--sec-text-primary);
+}
+
+.sec-text-secondary {
+  color: var(--sec-text-secondary);
+}
+
+.sec-bg-light {
+  background-color: var(--sec-gray-light);
+}
+
+.sec-border {
+  border: 1px solid var(--sec-gray-medium);
+}
+
+/* Responsive utilities */
+@media (max-width: 64em) {
+  .sec-hero {
+    padding: 2rem 0;
+  }
+  
+  .sec-card {
+    padding: 1rem;
+  }
+}
+
+

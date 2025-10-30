@@ -1,0 +1,68 @@
+{
+    "about": "This is a lookup table for the XSD paths for the form types",
+    "version": "1.0.0",
+    "formTypes": {
+        "3": [
+            { "bucket": "test.publicdata.guru", 
+                "key": "EdgarTechSpecs/ownershipxmltechspec-v5-4/EDGAR Ownership XML Technical Specification/EDGAR Reduced Content XML Schema Files/ownership3Document.xsd.xml", 
+                "run": true },
+            { 
+                "bucket": "test.publicdata.guru", 
+                "key": "EdgarTechSpecs/ownershipxmltechspec-v5-4/EDGAR Ownership XML Technical Specification/EDGAR Reduced Content XML Schema Files/ownershipDocumentCommon.xsd.xml", 
+                "run": false }
+        ],
+        "3/A": [
+            { "bucket": "test.publicdata.guru", 
+                "key": "EdgarTechSpecs/ownershipxmltechspec-v5-4/EDGAR Ownership XML Technical Specification/EDGAR Reduced Content XML Schema Files/ownership3ADocument.xsd.xml", 
+                "run": true },
+            { 
+                "bucket": "test.publicdata.guru", 
+                "key": "EdgarTechSpecs/ownershipxmltechspec-v5-4/EDGAR Ownership XML Technical Specification/EDGAR Reduced Content XML Schema Files/ownershipDocumentCommon.xsd.xml", 
+                "run": false }
+        ],
+        "4": [
+            { "bucket": "test.publicdata.guru", 
+                "key": "EdgarTechSpecs/ownershipxmltechspec-v5-4/EDGAR Ownership XML Technical Specification/EDGAR Reduced Content XML Schema Files/ownership4Document.xsd.xml", 
+                "run": true },
+            { 
+                "bucket": "test.publicdata.guru", 
+                "key": "EdgarTechSpecs/ownershipxmltechspec-v5-4/EDGAR Ownership XML Technical Specification/EDGAR Reduced Content XML Schema Files/ownershipDocumentCommon.xsd.xml", 
+                "run": false }
+        ],
+        "4/A": [
+            { "bucket": "test.publicdata.guru", 
+                "key": "EdgarTechSpecs/ownershipxmltechspec-v5-4/EDGAR Ownership XML Technical Specification/EDGAR Reduced Content XML Schema Files/ownership4ADocument.xsd.xml", 
+                "run": true },
+            { 
+                "bucket": "test.publicdata.guru", 
+                "key": "EdgarTechSpecs/ownershipxmltechspec-v5-4/EDGAR Ownership XML Technical Specification/EDGAR Reduced Content XML Schema Files/ownershipDocumentCommon.xsd.xml", 
+                "run": false }
+        ],
+        "5": [
+            { "bucket": "test.publicdata.guru", 
+                "key": "EdgarTechSpecs/ownershipxmltechspec-v5-4/EDGAR Ownership XML Technical Specification/EDGAR Reduced Content XML Schema Files/ownership5Document.xsd.xml", 
+                "run": true },
+            { 
+                "bucket": "test.publicdata.guru", 
+                "key": "EdgarTechSpecs/ownershipxmltechspec-v5-4/EDGAR Ownership XML Technical Specification/EDGAR Reduced Content XML Schema Files/ownershipDocumentCommon.xsd.xml", 
+                "run": false }
+        ],
+        "5/A": [
+            { "bucket": "test.publicdata.guru", 
+                "key": "EdgarTechSpecs/ownershipxmltechspec-v5-4/EDGAR Ownership XML Technical Specification/EDGAR Reduced Content XML Schema Files/ownership5ADocument.xsd.xml", 
+                "run": true },
+            { 
+                "bucket": "test.publicdata.guru", 
+                "key": "EdgarTechSpecs/ownershipxmltechspec-v5-4/EDGAR Ownership XML Technical Specification/EDGAR Reduced Content XML Schema Files/ownershipDocumentCommon.xsd.xml", 
+                "run": false }
+        ],
+        "NPORT-P": [ 
+            { "bucket": "test.publicdata.guru", "key": "EdgarTechSpecs/edgar-form-n-port-xml-tech-spec-113/EDGAR Form N-PORT XML schema files/eis_Common.xsd", "run": false },
+            { "bucket": "test.publicdata.guru", "key": "EdgarTechSpecs/edgar-form-n-port-xml-tech-spec-113/EDGAR Form N-PORT XML schema files/eis_ISO_StateCodes.xsd", "run": false },
+            { "bucket": "test.publicdata.guru", "key": "EdgarTechSpecs/edgar-form-n-port-xml-tech-spec-113/EDGAR Form N-PORT XML schema files/eis_NPORT_common.xsd", "run": false },
+            { "bucket": "test.publicdata.guru", "key": "EdgarTechSpecs/edgar-form-n-port-xml-tech-spec-113/EDGAR Form N-PORT XML schema files/eis_stateCodes.xsd", "run": false },
+            { "bucket": "test.publicdata.guru", "key": "EdgarTechSpecs/edgar-form-n-port-xml-tech-spec-113/EDGAR Form N-PORT XML schema files/eis_NPORT_Filer.xsd", "run": true }
+        ],
+        "NPORT-P/A": "NPORT-P"
+    }
+}

@@ -1141,26 +1141,15 @@ export const createSgml = async function(filingMetaData) {
  * @param {string} dissemFileKey - S3 key for dissemination file output
  * @returns {Promise<Object>} - Result object with success status
  * 
- * UUENCODE issues:  While the .DISSEM uuencoded binary files decode correctly, the text representation does not match SEC format due variation is the final line termination character.
- *   Resolution will require examine the SEC source code that performs uuencoding and reserve engineering the solution
+ * UUENCODE issues:  While the .DISSEM uuencoded binary files decode correctly, the text representation does not match SEC format due variation is the final linetermination character.
+ *   This is due to use of 0x01 (instead of the standard 0x00) as the padding byte when final line's bytes count % 3 != 0 
+ *   and by including the full 4 character encoding to the 3 byte triplet, even when the finally characters are not needed to decode (due ot line's byte length)
+ *
+ *   This encodeer (as do standard uuencoders) 100% matches EDGAR's uuencoding when bytes count % 3 == 0
+ *   This variant 100% matches EDGAR's uuencoding when bytes count % 3 == 1 and 2 padding bytes = 0x01 ox01 are added
+ *   This variant 91% matches EDGAR's uuencoding when bytes count % 3 == 2 and 1 padding byte = 0x01 is added.  
+ *     The remaining 3% (1/3 of 9%) edge cases are addressed by test the last line's terminal characters and adjusting
  * 
- * No tool matches SEC format:
- *     -  Linux uuencode tool: Uses backticks for padding - doesn't match SEC format
- *     -  NPM uuencode library: Uses spaces for padding - doesn't match SEC format
- *     -  SEC format: Uses proprietary padding (!, $!, D!) - unique to SEC
- *
- * SEC's UUENCODE Padding Rules (identified patterns):
- *     -  For 1 remaining byte: Always $! (100% consistent, 16/16 files)
- *     -  For 2 remaining bytes: Multiple patterns based on encoding variation:
- *        -  ! - Most common (9/11 files)
- *        -  Space + ! - Rare (1/11 files)
- *        -  D! - Special encoding variant (1/11 files)
- *
- *     Critical Discovery:
- *     -  The D! case revealed that SEC sometimes uses a different encoding algorithm for partial groups than the npm library. Both encodings:
- *        -  Are valid UUENCODE
- *        -  Decode to identical binary data
- *        -  Have different text representations
  */
 
 /**
@@ -1172,10 +1161,11 @@ export const createSgml = async function(filingMetaData) {
  * @returns {string} - The uuencoded string
  */
 export const uuEdgarEncode = function(binaryBuffer, fileName) {
-    const lines = [];
+    //const lines = [];
+    let uuencodeBlock = `begin 644 ${fileName}\n`;
     
     // Add begin line
-    lines.push(`begin 644 ${fileName}`);
+    //lines.push(`begin 644 ${fileName}`);
     
     // Encode 45 bytes per line
     const BYTES_PER_LINE = 45;
@@ -1220,17 +1210,27 @@ export const uuEdgarEncode = function(binaryBuffer, fileName) {
         }
         
         // Trim trailing spaces and add the line
-        const fullLine = lengthChar + encodedData;
-        lines.push(fullLine.trimEnd());
+        let trimmedLine = lengthChar + encodedData.trimEnd(); 
+        if(lengthChar != 'M' && trimmedLine.endsWith('_]D')) { //side case affect 
+            trimmedLine += '!';
+        }
+        if(lengthChar != 'M' && trimmedLine.endsWith('_\\!')) { //side case affect 
+            console.log('side case "_\\!" found!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+            trimmedLine = trimmedLine.slice(0,-3) + "_]D!";
+        }
+        uuencodeBlock += trimmedLine + '\n';
+        //nes.push(fullLine.trimEnd());
         
         offset += bytesToEncode;
     }
     
     // Add end line
-    lines.push('');
-    lines.push('end');
+    uuencodeBlock += '\nend';
+    //lines.push('');
+    //lines.push('end');
     
-    return lines.join('\n');
+    return uuencodeBlock;
+    //return lines.join('\n');
 };
 
 export const makeDisseminationFile = async function(filingMetadata, documentsBucket, documentsBucketFolder, dissemBucket, dissemFileKey) {
@@ -1280,9 +1280,7 @@ export const makeDisseminationFile = async function(filingMetadata, documentsBuc
                     
                     // Open read stream for the document
                     const documentStream = await s3ReadStream(documentsBucket, documentKey);
-                    const documentSize = await  s3ReadString(documentsBucket, documentKey);
                     if (isBinary) {
-                        let lengthCharCode, decodedBytes, expectedGroups, expectLineLength, remainingBytes, lastLine;
                         // For PDF files, write <PDF> tag before content
                         if (fileExtension === 'pdf') {
                             outputStream.write('<PDF>\n');
@@ -1296,8 +1294,8 @@ export const makeDisseminationFile = async function(filingMetadata, documentsBuc
                         const documentBuffer = Buffer.concat(documentChunks);
                         
                         // UUEncode using EDGAR-compatible encoding
-                        const uuencodedContent = uuEdgarEncode(documentBuffer, thisFileName);
-                        outputStream.write(uuencodedContent);
+                        //don't create another large string: const uuencodedContent = uuEdgarEncode(documentBuffer, thisFileName);
+                        outputStream.write(uuEdgarEncode(documentBuffer, thisFileName));
 
                         // For PDF files, write </PDF> tag after content
                         if (fileExtension === 'pdf') {
@@ -1369,5 +1367,6 @@ export const common = {
     extractXbrlFromIxbrl,
     validateXML,
     createSgml,
-    makeDisseminationFile
+    makeDisseminationFile,
+    uuEdgarEncode
 };
