@@ -24,7 +24,7 @@ function getDbPool() {
   return dbPool;
 }
 
-// Validate CIK format
+// Validate CIK and return entity information
 router.get('/validate/:cik', async (req, res, next) => {
   try {
     const { cik } = req.params;
@@ -38,12 +38,50 @@ router.get('/validate/:cik', async (req, res, next) => {
       });
     }
 
-    // Format CIK with leading zeros
-    const formattedCIK = formatCIK(cikNumber);
+    const db = getDbPool();
 
+    // Query entity table for all fields except created and modified
+    const [entities] = await db.query(
+      `SELECT 
+        cik,
+        conformed_name,
+        organization_name,
+        irs_number,
+        state_of_incorporation,
+        fiscal_year_end,
+        assigned_sic,
+        filing_form_type,
+        filing_act,
+        filing_file_number,
+        filing_film_number,
+        business_street1,
+        business_street2,
+        business_city,
+        business_state,
+        business_zip,
+        business_phone,
+        mail_street1,
+        mail_street2,
+        mail_city,
+        mail_state,
+        mail_zip
+      FROM entity 
+      WHERE cik = ?`,
+      [cikNumber]
+    );
+
+    if (entities.length === 0) {
+      return res.json({
+        valid: false,
+        message: 'CIK not found in database',
+        cik: cikNumber,
+      });
+    }
+
+    // Return entity data
     res.json({
       valid: true,
-      cik: formattedCIK,
+      ...entities[0],
     });
   } catch (error) {
     next(error);

@@ -81,6 +81,20 @@ router.post('/register', async (req, res, next) => {
 
     const token = generateToken(user);
 
+    // Get IP address and user agent
+    const ipAddress = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
+                     req.socket.remoteAddress || 
+                     req.ip || 
+                     'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+
+    // Create session record
+    await db.query(
+      `INSERT INTO user_sessions (user_id, token_hash, ip_address, user_agent, expires_at)
+       VALUES (?, SHA2(?, 256), ?, ?, DATE_ADD(NOW(), INTERVAL ? SECOND))`,
+      [user.id, token, ipAddress, userAgent, config.jwt.expiresIn]
+    );
+
     res.status(201).json({
       message: 'User registered successfully',
       token,
@@ -151,6 +165,20 @@ router.post('/login', async (req, res, next) => {
     // Generate token
     const token = generateToken(user);
 
+    // Get IP address and user agent
+    const ipAddress = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
+                     req.socket.remoteAddress || 
+                     req.ip || 
+                     'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+
+    // Create session record
+    await db.query(
+      `INSERT INTO user_sessions (user_id, token_hash, ip_address, user_agent, expires_at)
+       VALUES (?, SHA2(?, 256), ?, ?, DATE_ADD(NOW(), INTERVAL ? SECOND))`,
+      [user.id, token, ipAddress, userAgent, config.jwt.expiresIn]
+    );
+
     res.json({
       message: 'Login successful',
       token,
@@ -190,10 +218,27 @@ router.get('/me', authenticateToken, async (req, res, next) => {
 });
 
 // Logout (optional - mainly for session cleanup)
-router.post('/logout', authenticateToken, async (req, res) => {
-  // With JWT, logout is handled client-side by removing the token
-  // This endpoint is mainly for audit/logging purposes
-  res.json({ message: 'Logged out successfully' });
+router.post('/logout', authenticateToken, async (req, res, next) => {
+  try {
+    // Extract token from Authorization header
+    const token = req.headers.authorization?.split(' ')[1];
+    
+    if (token) {
+      const db = getDbPool();
+      
+      // Mark session as inactive and set logout time
+      await db.query(
+        `UPDATE user_sessions 
+         SET is_active = FALSE, logged_out_at = NOW() 
+         WHERE user_id = ? AND token_hash = SHA2(?, 256) AND is_active = TRUE`,
+        [req.user.id, token]
+      );
+    }
+    
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Change password

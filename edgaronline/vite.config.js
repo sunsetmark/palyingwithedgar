@@ -23,6 +23,20 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:3001',
         changeOrigin: true,
+        configure: (proxy, options) => {
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            // Get the real client IP
+            const clientIp = req.socket.remoteAddress || req.connection.remoteAddress;
+            
+            // Set X-Forwarded-For header to preserve the original client IP
+            const existingForwarded = req.headers['x-forwarded-for'];
+            if (existingForwarded) {
+              proxyReq.setHeader('x-forwarded-for', `${existingForwarded}, ${clientIp}`);
+            } else {
+              proxyReq.setHeader('x-forwarded-for', clientIp);
+            }
+          });
+        },
       },
     },
   },

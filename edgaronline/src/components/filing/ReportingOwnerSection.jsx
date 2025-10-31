@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useFiling } from '../../context/FilingContext';
 import { getFormConfig } from '../../config/formConfig';
-import api from '../../services/api';
+import { cikService } from '../../services/api';
 
 /**
  * Single Reporting Owner Form
@@ -10,7 +10,12 @@ import api from '../../services/api';
 const ReportingOwnerForm = ({ owner, index, onUpdate, onRemove, canRemove }) => {
   const [loading, setLoading] = useState(false);
   const [lookupError, setLookupError] = useState('');
+  const [cccError, setCccError] = useState('');
+  const [lookupSuccess, setLookupSuccess] = useState(!!owner?.lookupSuccess);
+  const [entityData, setEntityData] = useState(owner?.entityData || null);
   const [isExpanded, setIsExpanded] = useState(!owner?.cik);
+  const [validatingCcc, setValidatingCcc] = useState(false);
+  const [cccValidated, setCccValidated] = useState(!!owner?.cccValidated);
   
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm({
     defaultValues: owner || {
@@ -37,6 +42,7 @@ const ReportingOwnerForm = ({ owner, index, onUpdate, onRemove, canRemove }) => 
   
   const watchIsOther = watch('relationships.isOther');
   const watchIsOfficer = watch('relationships.isOfficer');
+  const watchRelationships = watch('relationships');
   
   const onSubmit = (data) => {
     onUpdate(data);
@@ -46,37 +52,118 @@ const ReportingOwnerForm = ({ owner, index, onUpdate, onRemove, canRemove }) => 
     const cik = document.getElementById(`owner-${index}-cik`).value;
     if (!cik || cik.length < 1) {
       setLookupError('Please enter a CIK number');
+      setLookupSuccess(false);
+      setEntityData(null);
       return;
     }
     
     setLoading(true);
     setLookupError('');
+    setLookupSuccess(false);
     
     try {
-      const response = await api.get(`/api/cik/validate/${cik}`);
-      const { entity } = response.data;
+      const result = await cikService.validate(cik);
       
-      // Populate form fields
-      setValue('name', entity.name || '');
-      
-      // Parse address
-      const addresses = entity.addresses?.mailing;
-      if (addresses) {
-        setValue('address.street1', addresses.street1 || '');
-        setValue('address.street2', addresses.street2 || '');
-        setValue('address.city', addresses.city || '');
-        setValue('address.state', addresses.stateOrCountry || '');
-        setValue('address.zipCode', addresses.zipCode || '');
+      if (!result.valid) {
+        setLookupError(result.message || result.error || 'CIK not found');
+        setLookupSuccess(false);
+        setEntityData(null);
+        return;
       }
+      
+      // Store entity data
+      const entity = {
+        cik: result.cik,
+        name: result.conformed_name || '',
+        address: {
+          street1: result.mail_street1 || result.business_street1 || '',
+          street2: result.mail_street2 || result.business_street2 || '',
+          city: result.mail_city || result.business_city || '',
+          state: result.mail_state || result.business_state || '',
+          zipCode: result.mail_zip || result.business_zip || ''
+        }
+      };
+      
+      setEntityData(entity);
+      setLookupSuccess(true);
+      
+      // Update form values
+      setValue('cik', entity.cik);
+      setValue('name', entity.name);
+      setValue('address.street1', entity.address.street1);
+      setValue('address.street2', entity.address.street2);
+      setValue('address.city', entity.address.city);
+      setValue('address.state', entity.address.state);
+      setValue('address.zipCode', entity.address.zipCode);
       
       // Trigger validation and save
       handleSubmit(onSubmit)();
     } catch (error) {
       console.error('CIK lookup error:', error);
-      setLookupError(error.response?.data?.error || 'Failed to lookup CIK.');
+      setLookupError(error.response?.data?.message || error.response?.data?.error || 'Failed to lookup CIK.');
+      setLookupSuccess(false);
+      setEntityData(null);
     } finally {
       setLoading(false);
     }
+  };
+  
+  const handleValidateCcc = async () => {
+    const ccc = document.getElementById(`owner-${index}-ccc`).value;
+    const cik = entityData?.cik || document.getElementById(`owner-${index}-cik`)?.value;
+    
+    if (!cik) {
+      setCccError('Please lookup CIK first');
+      return;
+    }
+    
+    if (!ccc || ccc.length !== 8) {
+      setCccError('CCC must be exactly 8 characters');
+      setCccValidated(false);
+      return;
+    }
+    
+    setValidatingCcc(true);
+    setCccError('');
+    
+    try {
+      const result = await cikService.verify(cik, ccc);
+      
+      if (result.valid) {
+        setCccValidated(true);
+        setValue('ccc', ccc);
+        handleSubmit(onSubmit)();
+      } else {
+        setCccError(result.message || result.error || 'Invalid CCC for this CIK');
+        setCccValidated(false);
+      }
+    } catch (error) {
+      console.error('CCC validation error:', error);
+      setCccError(error.response?.data?.message || error.response?.data?.error || 'CCC validation failed');
+      setCccValidated(false);
+    } finally {
+      setValidatingCcc(false);
+    }
+  };
+  
+  const handleClearLookup = () => {
+    setLookupSuccess(false);
+    setEntityData(null);
+    setCccValidated(false);
+    setValue('cik', '');
+    setValue('ccc', '');
+    setValue('name', '');
+    setValue('address.street1', '');
+    setValue('address.street2', '');
+    setValue('address.city', '');
+    setValue('address.state', '');
+    setValue('address.zipCode', '');
+  };
+  
+  // Validate that at least one relationship checkbox is selected
+  const validateRelationships = () => {
+    const rels = watchRelationships;
+    return rels.isDirector || rels.isOfficer || rels.isTenPercentOwner || rels.isOther;
   };
   
   return (

@@ -132,7 +132,8 @@ const FormTypeStep = () => {
                       className="usa-button width-full"
                       style={{
                         backgroundColor: iconColor,
-                        borderColor: iconColor
+                        borderColor: iconColor,
+                        color: '#ffffff'
                       }}
                       onClick={(e) => {
                         e.stopPropagation();

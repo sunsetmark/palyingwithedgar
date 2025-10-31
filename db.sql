@@ -1157,20 +1157,23 @@ CREATE TABLE IF NOT EXISTS exhibit_files (
     INDEX idx_s3_key (s3_key(255))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Exhibit file metadata';
 
--- Session management (optional - if not using JWT only)
+-- Session management (tracks user login sessions with JWT tokens)
 CREATE TABLE IF NOT EXISTS user_sessions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    token_hash VARCHAR(255) NOT NULL,
-    ip_address VARCHAR(45),
-    user_agent VARCHAR(255),
+    token_hash VARCHAR(255) NOT NULL COMMENT 'SHA2-256 hash of JWT token for security',
+    ip_address VARCHAR(45) COMMENT 'IP address of the client',
+    user_agent VARCHAR(255) COMMENT 'Browser user agent string',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP NOT NULL,
+    expires_at TIMESTAMP NOT NULL COMMENT 'JWT token expiration time',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE COMMENT 'Whether session is currently active',
+    logged_out_at TIMESTAMP NULL DEFAULT NULL COMMENT 'Time when user explicitly logged out',
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_user_id (user_id),
     INDEX idx_token_hash (token_hash),
-    INDEX idx_expires_at (expires_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Active user sessions';
+    INDEX idx_expires_at (expires_at),
+    INDEX idx_user_active (user_id, is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='User login sessions with JWT token tracking';
 
 -- Audit log for important actions
 CREATE TABLE IF NOT EXISTS audit_log (
