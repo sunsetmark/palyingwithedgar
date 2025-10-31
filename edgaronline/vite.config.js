@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import fs from 'fs';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -19,10 +20,15 @@ export default defineConfig({
   server: {
     host: '0.0.0.0', // Allow connections from any IP address
     port: 3000,
+    https: {
+      key: fs.readFileSync('/home/ec2-user/poc/ssl/localhost.key'),
+      cert: fs.readFileSync('/home/ec2-user/poc/ssl/localhost.crt')
+    },
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'https://localhost:3001',  // Changed to HTTPS
         changeOrigin: true,
+        secure: false,  // Accept self-signed certificates
         configure: (proxy, options) => {
           proxy.on('proxyReq', (proxyReq, req, res) => {
             // Get the real client IP

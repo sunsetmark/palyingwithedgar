@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "=== Restarting Edgar Online Services ==="
+echo "=== Restarting Edgar Online Services (HTTPS) ==="
 
 # Kill only our specific node processes (not Cursor)
 echo "Stopping Edgar Online services..."
@@ -46,9 +46,16 @@ echo "Frontend started (PID: $FRONTEND_PID)"
 sleep 3
 
 echo ""
-echo "=== Services Started ==="
-echo "Backend API:  http://localhost:3001 (PID: $API_PID)"
-echo "Frontend:     http://54.175.98.68:3000 (PID: $FRONTEND_PID)"
+echo "=== Services Started (HTTPS) ==="
+echo "Backend API:  https://54.175.98.68:3001 (PID: $API_PID) 🔒"
+echo "Frontend:     https://54.175.98.68:3000 (PID: $FRONTEND_PID) 🔒"
+echo ""
+echo "⚠️  Browser Security Warning:"
+echo "    You'll see a certificate warning due to self-signed certificate."
+echo "    Click 'Advanced' → 'Proceed to site' to continue."
+echo ""
+echo "SSL Certificate Location: /home/ec2-user/poc/ssl/"
+echo "  Valid until: October 30, 2030 (5 years)"
 echo ""
 echo "View logs:"
 echo "  Backend:  tail -f /tmp/edgaronline_api.log"

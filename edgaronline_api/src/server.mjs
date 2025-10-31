@@ -1,8 +1,15 @@
 import express from 'express';
+import https from 'https';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { config } from '../config/config.mjs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Import routes
 import authRoutes from './routes/auth.mjs';
@@ -44,7 +51,10 @@ const allowedOrigins = [
   config.frontendUrl,
   'http://localhost:3000',
   'http://127.0.0.1:3000',
-  'http://54.175.98.68:3000', // EC2 public IP
+  'http://54.175.98.68:3000',
+  'https://localhost:3000',
+  'https://127.0.0.1:3000',
+  'https://54.175.98.68:3000', // EC2 public IP (HTTPS)
 ];
 
 app.use(cors({
@@ -125,24 +135,33 @@ app.use((req, res) => {
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
-// Start server
+// SSL certificate configuration
+const sslOptions = {
+  key: fs.readFileSync('/home/ec2-user/poc/ssl/localhost.key'),
+  cert: fs.readFileSync('/home/ec2-user/poc/ssl/localhost.crt')
+};
+
+// Create HTTPS server
 const PORT = config.port;
-app.listen(PORT, () => {
+const httpsServer = https.createServer(sslOptions, app);
+
+httpsServer.listen(PORT, () => {
   console.log(`
 ╔═══════════════════════════════════════╗
-║   EDGAR Online API Server             ║
+║   EDGAR Online API Server (HTTPS)    ║
 ║   Environment: ${config.env.padEnd(24)}║
 ║   Port: ${PORT.toString().padEnd(30)}║
 ║   Frontend: ${config.frontendUrl.padEnd(24)}║
+║   🔒 Secure Connection Enabled        ║
 ╚═══════════════════════════════════════╝
   `);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
+  console.log('SIGTERM signal received: closing HTTPS server');
+  httpsServer.close(() => {
+    console.log('HTTPS server closed');
     process.exit(0);
   });
 });
