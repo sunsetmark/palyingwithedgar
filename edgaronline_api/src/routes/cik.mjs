@@ -64,8 +64,11 @@ router.get('/validate/:cik', async (req, res, next) => {
         mail_street2,
         mail_city,
         mail_state,
-        mail_zip
-      FROM entity 
+        mail_zip,
+        sc.country_name as mail_country,
+        sc.state_prov_name as mail_state_prov_long
+      FROM entity e 
+        left outer join state_country_ref sc on e.mail_state = sc.edgar_code 
       WHERE cik = ?`,
       [cikNumber]
     );
